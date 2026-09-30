@@ -1,6 +1,6 @@
 # Datos
 
-`educacion_municipios.csv`: descargado del Portal Nacional de Datos Abiertos de Colombia.
+`educacion_municipios.csv`: Descargado del Portal Nacional de Datos Abiertos de Colombia.
 
 - Entidad: Ministerio de Educación Nacional
 - URL: https://www.datos.gov.co/Educaci-n/MEN_ESTADISTICAS_EN_EDUCACION_EN_PREESCOLAR-B-SICA/nudc-7mev
