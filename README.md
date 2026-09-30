@@ -1,8 +1,8 @@
 # Análisis exploratorio: Educación preescolar, básica y media en Colombia
 
-Proyecto del **Grupo 1**. Análisis exploratorio de la población en edad escolar (5 a 16 años) y sus indicadores educativos por municipio, con datos del Portal Nacional de Datos Abiertos de Colombia.
+Proyecto del Grupo 1. 
+Análisis exploratorio de la población en edad escolar (5 a 16 años) y sus indicadores educativos por municipio, con datos del Portal Nacional de Datos Abiertos de Colombia.
 
-La aplicación web está desarrollada con Python, Flask y Bootstrap.
 
 ## Conjunto de datos
 
@@ -17,10 +17,10 @@ La aplicación web está desarrollada con Python, Flask y Bootstrap.
 
 | N.º | Integrante | Dimensión | Responsabilidad |
 |-----|------------|-----------|-----------------|
-| 1 | (nombre) | Poblacional | Administración del repositorio |
-| 2 | (nombre) | Territorial | Configuración de Flask |
-| 3 | (nombre) | Temporal | Publicación de la aplicación |
-| 4 | (nombre) | Relacional y multivariada | Informe técnico |
+| 1 | Ingrid Katherin Caicedo Rodriguez | Poblacional | Administración del repositorio |
+| 2 | Juan Manuel Ramirez Araque | Territorial | Configuración de Flask |
+| 3 | Oscar Felipe Delgado Alfonso | Temporal | Publicación de la aplicación |
+| 4 | Johan Sneider Cortes Benal | Relacional y multivariada | Informe técnico |
 
 ## Enlaces
 
