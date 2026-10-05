@@ -222,25 +222,27 @@ def _generar_graficas(series):
 	fig.tight_layout()
 	graficas["g1"] = _fig_to_b64(fig)
 
-	# Gráfica 2: Conectividad a Internet
-	fig, ax = plt.subplots(figsize=(9, 4))
-	ax.set_facecolor("#f8fbf9")
-	fig.patch.set_facecolor("#ffffff")
-	ax.fill_between(anios, series["conectividad"], alpha=0.18, color=colores[2])
-	ax.plot(anios, series["conectividad"], color=colores[2], linewidth=2.4,
-			marker="D", markersize=5, label="Sedes conectadas (%)")
-	for x, y in zip(anios, series["conectividad"]):
-		if y > 0:
+	# Gráfica 2: Conectividad a Internet (solo años con reporte válido)
+	con_pares = [(a, v) for a, v in zip(anios, series["conectividad"]) if v > 0]
+	if con_pares:
+		con_anios, con_vals = zip(*con_pares)
+		fig, ax = plt.subplots(figsize=(9, 4))
+		ax.set_facecolor("#f8fbf9")
+		fig.patch.set_facecolor("#ffffff")
+		ax.fill_between(con_anios, con_vals, alpha=0.18, color=colores[2])
+		ax.plot(con_anios, con_vals, color=colores[2], linewidth=2.4,
+				marker="D", markersize=5, label="Sedes conectadas (%)")
+		for x, y in zip(con_anios, con_vals):
 			ax.annotate(f"{y:.1f}", (x, y), textcoords="offset points",
 						xytext=(0, 7), ha="center", fontsize=7.5, color=colores[2])
-	ax.set_ylabel("Sedes conectadas (%)", fontsize=9)
-	ax.set_xticks(anios)
-	ax.set_xticklabels([str(a) for a in anios], rotation=45, ha="right")
-	ax.tick_params(labelsize=8)
-	ax.grid(axis="y", linestyle="--", alpha=0.4)
-	ax.legend(fontsize=8)
-	fig.tight_layout()
-	graficas["g2"] = _fig_to_b64(fig)
+		ax.set_ylabel("Sedes conectadas (%)", fontsize=9)
+		ax.set_xticks(con_anios)
+		ax.set_xticklabels([str(a) for a in con_anios], rotation=45, ha="right")
+		ax.tick_params(labelsize=8)
+		ax.grid(axis="y", linestyle="--", alpha=0.4)
+		ax.legend(fontsize=8)
+		fig.tight_layout()
+		graficas["g2"] = _fig_to_b64(fig)
 
 	# Gráfica 3: Cobertura por nivel educativo
 	fig, ax = plt.subplots(figsize=(9, 4))
