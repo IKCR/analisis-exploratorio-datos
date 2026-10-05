@@ -4,6 +4,9 @@ from collections import defaultdict
 from pathlib import Path
 
 from flask import Flask, render_template, send_file
+from flask import request
+
+from poblacional import tablero_poblacional
 
 app = Flask(__name__)
 
@@ -139,12 +142,12 @@ def dataset_file():
 
 @app.route("/analisis/poblacional")
 def poblacional():
-	resumen = dataset_summary()
+	anio = request.args.get("anio", type=int)
+	departamento = request.args.get("departamento")
 	return render_template(
 		"analisis/poblacional.html",
 		titulo="Dimensión poblacional",
-		resumen=resumen,
-		top_municipios=top_municipios(),
+		datos=tablero_poblacional(anio, departamento),
 	)
 
 
