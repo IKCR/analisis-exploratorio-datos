@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ titulo }} | EduMunicipios{% endblock %}
+
+{% block contenido %}
+<section class="hero-section">
+  <div class="container hero-content">
+    <div class="hero-copy">
+      <p class="eyebrow"><span></span> Educación que se entiende desde el territorio</p>
+      <h1>Estadísticas en Educación <span>por municipio</span></h1>
+      <p class="hero-lead">Este proyecto reúne indicadores educativos por municipio para explorar cómo se comportan la matrícula, la cobertura, la deserción y otros factores clave en distintos niveles educativos. La intención es transformar los datos en una lectura clara, comparativa y útil para comprender el contexto escolar en cada territorio.</p>
+      <a class="btn btn-primary btn-hero" href="{{ url_for('poblacional') }}">Explorar análisis <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+    </div>
+    <div class="hero-aside" aria-hidden="true">
+      <div class="hero-symbol"><i class="bi bi-mortarboard-fill"></i></div>
+      <span class="hero-aside-label">Conocimiento local</span>
+      <span class="hero-aside-rule"></span>
+      <span class="hero-aside-note">Cada municipio<br>cuenta una historia.</span>
+    </div>
+  </div>
+
+</section>
+
+<section class="dimensions-section">
+  <div class="container">
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">Cuatro formas de explorar</p>
+        <h2>Dimensiones de análisis</h2>
+      </div>
+      <p>Un punto de partida para recorrer la educación municipal.</p>
+    </div>
+    <div class="row g-4">
+      <div class="col-md-6">
+        <article class="dimension-card dimension-population h-100">
+          <div class="dimension-card-top">
+            <span class="dimension-icon"><i class="bi bi-people-fill" aria-hidden="true"></i></span>
+            <span class="dimension-index">01</span>
+          </div>
+          <h3>Dimensión poblacional</h3>
+          <p>Explora la población estudiantil y su relación con los niveles educativos del municipio.</p>
+          <a class="btn btn-outline-primary card-link" href="{{ url_for('poblacional') }}">Ver dimensión <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+        </article>
+      </div>
+      <div class="col-md-6">
+        <article class="dimension-card dimension-territory h-100">
+          <div class="dimension-card-top">
+            <span class="dimension-icon"><i class="bi bi-map-fill" aria-hidden="true"></i></span>
+            <span class="dimension-index">02</span>
+          </div>
+          <h3>Dimensión territorial</h3>
+          <p>Consulta una perspectiva territorial para comparar y comprender los municipios.</p>
+          <a class="btn btn-outline-primary card-link" href="{{ url_for('territorial') }}">Ver dimensión <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+        </article>
+      </div>
+      <div class="col-md-6">
+        <article class="dimension-card dimension-territory h-100">
+          <div class="dimension-card-top">
+            <span class="dimension-icon"><i class="bi bi-calendar3" aria-hidden="true"></i></span>
+            <span class="dimension-index">03</span>
+          </div>
+          <h3>Dimensión temporal</h3>
+          <p>Estudia la evolución y el cambio en indicadores educativos a lo largo del tiempo.</p>
+          <a class="btn btn-outline-primary card-link" href="{{ url_for('temporal') }}">Ver dimensión <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+        </article>
+      </div>
+      <div class="col-md-6">
+        <article class="dimension-card dimension-population h-100">
+          <div class="dimension-card-top">
+            <span class="dimension-icon"><i class="bi bi-diagram-3" aria-hidden="true"></i></span>
+            <span class="dimension-index">04</span>
+          </div>
+          <h3>Dimensión multivariada</h3>
+          <p>Relaciona varias variables para detectar patrones y comportamientos regionales.</p>
+          <a class="btn btn-outline-primary card-link" href="{{ url_for('multivariada') }}">Ver dimensión <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+        </article>
+      </div>
+    </div>
+    <p class="levels-note"><i class="bi bi-book-half" aria-hidden="true"></i><span>El proyecto aborda los niveles de <strong>preescolar, básica y media</strong>.</span></p>
+  </div>
+</section>
+{% endblock %}
