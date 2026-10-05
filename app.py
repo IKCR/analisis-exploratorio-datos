@@ -1,20 +1,16 @@
-import base64
 import csv
-import io
+import json
 from collections import defaultdict
 from pathlib import Path
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
-
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, send_file
 
 app = Flask(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
 DATASET_PATH = BASE_DIR / "data" / "educacion_municipios.csv"
+
+_CACHE_TEMPORAL = None
 
 
 def _to_float(value):
@@ -82,6 +78,55 @@ def top_municipios(limit=5):
 	]
 
 
+def _build_datos_temporales():
+	global _CACHE_TEMPORAL
+	if _CACHE_TEMPORAL is not None:
+		return _CACHE_TEMPORAL
+
+	rows = load_dataset()
+	grupos = defaultdict(lambda: defaultdict(lambda: {
+		"cob": [], "des": [], "con": [],
+		"cob_t": [], "cob_p": [], "cob_s": [], "cob_m": [],
+	}))
+
+	for row in rows:
+		try:
+			anio = int(row.get("AÑO", 0))
+		except ValueError:
+			continue
+		depto = row.get("DEPARTAMENTO", "").strip()
+		if not depto or anio < 2011:
+			continue
+
+		campos = {
+			"cob":   _to_float(row.get("COBERTURA_NETA")),
+			"des":   _to_float(row.get("DESERCIÓN")),
+			"con":   _to_float(row.get("SEDES_CONECTADAS_A_INTERNET")),
+			"cob_t": _to_float(row.get("COBERTURA_NETA_TRANSICIÓN")),
+			"cob_p": _to_float(row.get("COBERTURA_NETA_PRIMARIA")),
+			"cob_s": _to_float(row.get("COBERTURA_NETA_SECUNDARIA")),
+			"cob_m": _to_float(row.get("COBERTURA_NETA_MEDIA")),
+		}
+
+		for destino in [depto, "TODOS"]:
+			g = grupos[destino][anio]
+			for campo, v in campos.items():
+				if v > 0:
+					g[campo].append(v)
+
+	def _avg(lst):
+		return round(sum(lst) / len(lst), 2) if lst else None
+
+	resultado = {}
+	for depto, por_anio in grupos.items():
+		resultado[depto] = {}
+		for anio, g in por_anio.items():
+			resultado[depto][anio] = {k: _avg(v) for k, v in g.items()}
+
+	_CACHE_TEMPORAL = resultado
+	return resultado
+
+
 @app.route("/")
 def inicio():
 	return render_template("index.html", titulo="Estadísticas en Educación", resumen=dataset_summary())
@@ -114,182 +159,15 @@ def territorial():
 	)
 
 
-def _fig_to_b64(fig):
-	buf = io.BytesIO()
-	fig.savefig(buf, format="png", bbox_inches="tight", dpi=110)
-	buf.seek(0)
-	data = base64.b64encode(buf.read()).decode("utf-8")
-	plt.close(fig)
-	return data
-
-
-def _colores_lineas():
-	return ["#1ea86a", "#ff7b54", "#8c6bff", "#ffc857"]
-
-
-def _procesar_temporal(departamento=None, rango=None):
-	rows = load_dataset()
-	if not rows:
-		return {}, {}, {}, [], {}
-
-	anio_min, anio_max = 2011, 2024
-	if rango == "2011-2018":
-		anio_max = 2018
-	elif rango == "2019-2024":
-		anio_min = 2019
-
-	filtrados = []
-	for row in rows:
-		try:
-			anio = int(row.get("AÑO", 0))
-		except ValueError:
-			continue
-		if not (anio_min <= anio <= anio_max):
-			continue
-		if departamento and departamento != "TODOS":
-			if row.get("DEPARTAMENTO", "").strip() != departamento:
-				continue
-		filtrados.append(row)
-
-	# Agrupación por año
-	por_anio = defaultdict(lambda: {"cob": [], "des": [], "con": [],
-									"cob_t": [], "cob_p": [], "cob_s": [], "cob_m": []})
-	for row in filtrados:
-		anio = int(row.get("AÑO", 0))
-		por_anio[anio]["cob"].append(_to_float(row.get("COBERTURA_NETA")))
-		por_anio[anio]["des"].append(_to_float(row.get("DESERCIÓN")))
-		por_anio[anio]["con"].append(_to_float(row.get("SEDES_CONECTADAS_A_INTERNET")))
-		por_anio[anio]["cob_t"].append(_to_float(row.get("COBERTURA_NETA_TRANSICIÓN")))
-		por_anio[anio]["cob_p"].append(_to_float(row.get("COBERTURA_NETA_PRIMARIA")))
-		por_anio[anio]["cob_s"].append(_to_float(row.get("COBERTURA_NETA_SECUNDARIA")))
-		por_anio[anio]["cob_m"].append(_to_float(row.get("COBERTURA_NETA_MEDIA")))
-
-	anios = sorted(por_anio.keys())
-
-	def _promedio(lista):
-		validos = [v for v in lista if v > 0]
-		return round(sum(validos) / len(validos), 2) if validos else 0.0
-
-	series = {
-		"anios": anios,
-		"cobertura": [_promedio(por_anio[a]["cob"]) for a in anios],
-		"desercion": [_promedio(por_anio[a]["des"]) for a in anios],
-		"conectividad": [_promedio(por_anio[a]["con"]) for a in anios],
-		"cob_transicion": [_promedio(por_anio[a]["cob_t"]) for a in anios],
-		"cob_primaria": [_promedio(por_anio[a]["cob_p"]) for a in anios],
-		"cob_secundaria": [_promedio(por_anio[a]["cob_s"]) for a in anios],
-		"cob_media": [_promedio(por_anio[a]["cob_m"]) for a in anios],
-	}
-
-	# KPIs globales del período filtrado
-	kpis = {
-		"cobertura": _promedio([_to_float(r.get("COBERTURA_NETA")) for r in filtrados]),
-		"desercion": _promedio([_to_float(r.get("DESERCIÓN")) for r in filtrados]),
-		"conectividad": _promedio([_to_float(r.get("SEDES_CONECTADAS_A_INTERNET")) for r in filtrados]),
-	}
-
-	return series, kpis, filtrados
-
-
-def _generar_graficas(series):
-	colores = _colores_lineas()
-	anios = series["anios"]
-	graficas = {}
-
-	# Gráfica 1: Cobertura Neta vs. Deserción (doble eje)
-	fig, ax1 = plt.subplots(figsize=(9, 4))
-	ax1.set_facecolor("#f8fbf9")
-	fig.patch.set_facecolor("#ffffff")
-	ax1.plot(anios, series["cobertura"], color=colores[0], linewidth=2.2,
-			 marker="o", markersize=5, label="Cobertura Neta (%)")
-	ax1.set_ylabel("Cobertura Neta (%)", color=colores[0], fontsize=9)
-	ax1.tick_params(axis="y", labelcolor=colores[0], labelsize=8)
-	ax1.tick_params(axis="x", labelsize=8)
-	ax1.yaxis.set_major_formatter(mticker.FormatStrFormatter("%.1f"))
-	ax2 = ax1.twinx()
-	ax2.plot(anios, series["desercion"], color=colores[1], linewidth=2.2,
-			 marker="s", markersize=5, linestyle="--", label="Deserción (%)")
-	ax2.set_ylabel("Deserción (%)", color=colores[1], fontsize=9)
-	ax2.tick_params(axis="y", labelcolor=colores[1], labelsize=8)
-	ax2.yaxis.set_major_formatter(mticker.FormatStrFormatter("%.1f"))
-	lines1, labels1 = ax1.get_legend_handles_labels()
-	lines2, labels2 = ax2.get_legend_handles_labels()
-	ax1.legend(lines1 + lines2, labels1 + labels2, fontsize=8, loc="upper right")
-	ax1.set_xticks(anios)
-	ax1.set_xticklabels([str(a) for a in anios], rotation=45, ha="right")
-	ax1.grid(axis="y", linestyle="--", alpha=0.4)
-	ax1.axvspan(2019, 2021, alpha=0.08, color="#ff7b54", label="Período COVID-19")
-	fig.tight_layout()
-	graficas["g1"] = _fig_to_b64(fig)
-
-	# Gráfica 2: Conectividad a Internet (solo años con reporte válido)
-	con_pares = [(a, v) for a, v in zip(anios, series["conectividad"]) if v > 0]
-	if con_pares:
-		con_anios, con_vals = zip(*con_pares)
-		fig, ax = plt.subplots(figsize=(9, 4))
-		ax.set_facecolor("#f8fbf9")
-		fig.patch.set_facecolor("#ffffff")
-		ax.fill_between(con_anios, con_vals, alpha=0.18, color=colores[2])
-		ax.plot(con_anios, con_vals, color=colores[2], linewidth=2.4,
-				marker="D", markersize=5, label="Sedes conectadas (%)")
-		for x, y in zip(con_anios, con_vals):
-			ax.annotate(f"{y:.1f}", (x, y), textcoords="offset points",
-						xytext=(0, 7), ha="center", fontsize=7.5, color=colores[2])
-		ax.set_ylabel("Sedes conectadas (%)", fontsize=9)
-		ax.set_xticks(con_anios)
-		ax.set_xticklabels([str(a) for a in con_anios], rotation=45, ha="right")
-		ax.tick_params(labelsize=8)
-		ax.grid(axis="y", linestyle="--", alpha=0.4)
-		ax.legend(fontsize=8)
-		fig.tight_layout()
-		graficas["g2"] = _fig_to_b64(fig)
-
-	# Gráfica 3: Cobertura por nivel educativo
-	fig, ax = plt.subplots(figsize=(9, 4))
-	ax.set_facecolor("#f8fbf9")
-	fig.patch.set_facecolor("#ffffff")
-	niveles = [
-		("Transición", series["cob_transicion"], colores[0]),
-		("Primaria", series["cob_primaria"], colores[1]),
-		("Secundaria", series["cob_secundaria"], colores[2]),
-		("Media", series["cob_media"], colores[3]),
-	]
-	for nombre, datos, color in niveles:
-		ax.plot(anios, datos, linewidth=2, marker="o", markersize=4,
-				label=nombre, color=color)
-	ax.set_ylabel("Cobertura Neta (%)", fontsize=9)
-	ax.set_xticks(anios)
-	ax.set_xticklabels([str(a) for a in anios], rotation=45, ha="right")
-	ax.tick_params(labelsize=8)
-	ax.grid(axis="y", linestyle="--", alpha=0.4)
-	ax.legend(fontsize=8, ncol=2)
-	fig.tight_layout()
-	graficas["g3"] = _fig_to_b64(fig)
-
-	return graficas
-
-
 @app.route("/analisis/temporal")
 def temporal():
-	departamento = request.args.get("departamento", "TODOS")
-	rango = request.args.get("rango", "2011-2024")
-
-	rows = load_dataset()
-	departamentos = sorted(
-		{r.get("DEPARTAMENTO", "").strip() for r in rows if r.get("DEPARTAMENTO", "").strip()},
-	)
-
-	series, kpis, _ = _procesar_temporal(departamento, rango)
-	graficas = _generar_graficas(series) if series.get("anios") else {}
-
+	datos = _build_datos_temporales()
+	departamentos = sorted(k for k in datos if k != "TODOS")
 	return render_template(
 		"analisis/temporal.html",
 		titulo="Dimensión temporal",
 		departamentos=departamentos,
-		departamento_sel=departamento,
-		rango_sel=rango,
-		kpis=kpis,
-		graficas=graficas,
+		datos_json=json.dumps(datos, ensure_ascii=False),
 	)
 
 
