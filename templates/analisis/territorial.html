@@ -4,18 +4,216 @@
 
 {% block contenido %}
 <section class="analysis-section">
-  <div class="container analysis-container">
+  <div class="container analysis-container" style="max-width: 1100px;">
     <p class="eyebrow"><i class="bi bi-geo-alt" aria-hidden="true"></i> Análisis de datos</p>
-    <h1>{{ titulo }}</h1>
-    <p class="analysis-lead">Esta dimensión está preparada para analizar el comportamiento territorial y la comparación entre municipios en una segunda etapa.</p>
+    <h1>Dimensión territorial: distribución, concentración y participación por territorio</h1>
+    <p class="analysis-lead">
+      El conjunto de registros permite comparar cómo se distribuye la información por departamentos y municipios,
+      identificar los territorios con más y menos observaciones y estimar la participación relativa de cada unidad.
+    </p>
 
-    <div class="construction-panel">
-      <span class="construction-icon"><i class="bi bi-tools" aria-hidden="true"></i></span>
-      <div>
-        <h2>Sin contenido por ahora</h2>
-        <p>La información de esta dimensión se agregará más adelante.</p>
+    <div class="stats-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 20px;">
+      <div class="stat-tile highlight-tile">
+        <span class="stat-label"><i class="bi bi-database-check" aria-hidden="true"></i> Registros totales</span>
+        <strong>{{ territorios.departamentos|sum(attribute='valor') }}</strong>
+      </div>
+      <div class="stat-tile">
+        <span class="stat-label"><i class="bi bi-map" aria-hidden="true"></i> Departamentos</span>
+        <strong>{{ territorios.departamentos|length }}</strong>
+      </div>
+      <div class="stat-tile">
+        <span class="stat-label"><i class="bi bi-geo-fill" aria-hidden="true"></i> Municipio dominante</span>
+        <strong>{{ territorios.municipios[0].label if territorios.municipios else '—' }}</strong>
+      </div>
+    </div>
+
+    <div class="territorial-charts">
+      <div class="data-panel territorial-chart-panel territorial-chart-wide">
+        <div class="panel-header">
+          <h2>Distribución por departamento</h2>
+          <span class="panel-chip"><i class="bi bi-bar-chart" aria-hidden="true"></i> Frecuencia</span>
+        </div>
+        <div class="territorial-chart-canvas">
+          <canvas id="chart-departamentos"></canvas>
+        </div>
+        <p class="mt-3" style="color:var(--muted); font-size:.9rem; line-height:1.7;">
+          La concentración de registros se presenta primero por departamento, lo que ayuda a reconocer cuáles son las
+          unidades administrativas con mayor volumen de observaciones y dónde se concentra el mayor peso del análisis.
+        </p>
+      </div>
+
+      <div class="data-panel territorial-chart-panel">
+        <div class="panel-header">
+          <h2>Territorios con mayor y menor cantidad de registros</h2>
+          <span class="panel-chip"><i class="bi bi-sort-down-alt" aria-hidden="true"></i> Extremos</span>
+        </div>
+        <div class="territorial-chart-canvas">
+          <canvas id="chart-extremos"></canvas>
+        </div>
+        <p class="mt-3" style="color:var(--muted); font-size:.9rem; line-height:1.7;">
+          El comportamiento territorial no es uniforme: algunos municipios y zonas reportan muchísimos más registros,
+          mientras otros aparecen apenas con observaciones aisladas. La comparación entre máximos y mínimos ayuda a detectar
+          la variabilidad del dato por ubicación.
+        </p>
+      </div>
+
+      <div class="data-panel territorial-chart-panel">
+        <div class="panel-header">
+          <h2>Participación porcentual de cada territorio</h2>
+          <span class="panel-chip"><i class="bi bi-pie-chart" aria-hidden="true"></i> Participación</span>
+        </div>
+        <div class="territorial-chart-canvas territorial-chart-doughnut">
+          <canvas id="chart-participacion"></canvas>
+        </div>
+        <p class="mt-3" style="color:var(--muted); font-size:.9rem; line-height:1.7;">
+          La participación relativa permite visualizar el peso de cada departamento dentro del total del conjunto analizado,
+          reforzando la lectura de la desigualdad territorial y la concentración de los datos en unos pocos territorios.
+        </p>
       </div>
     </div>
   </div>
 </section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+  const TERRITORIO = {{ territorios_json|safe }};
+  const C = {
+    green: '#1ea86a',
+    coral: '#ff7b54',
+    purple: '#8c6bff',
+    muted: '#5d7380'
+  };
+
+  const departamentoData = (TERRITORIO.departamentos || []).slice(0, 10);
+  const mayorMunicipios = (TERRITORIO.extremos_municipios && TERRITORIO.extremos_municipios.mayores) || [];
+  const menorMunicipios = (TERRITORIO.extremos_municipios && TERRITORIO.extremos_municipios.menores) || [];
+  const participacionData = (TERRITORIO.participacion_departamentos || []).slice(0, 8);
+
+  const fallback = [{ label: 'Sin datos', valor: 0 }];
+  const deptLabels = (departamentoData.length ? departamentoData : fallback).map(item => item.label);
+  const deptValues = (departamentoData.length ? departamentoData : fallback).map(item => item.valor);
+
+  const mayorLabels = (mayorMunicipios.length ? mayorMunicipios : fallback).map(item => item.label);
+  const mayorValues = (mayorMunicipios.length ? mayorMunicipios : fallback).map(item => item.valor);
+  const menorLabels = (menorMunicipios.length ? menorMunicipios : fallback).map(item => item.label);
+  const menorValues = (menorMunicipios.length ? menorMunicipios : fallback).map(item => item.valor);
+
+  const partLabels = (participacionData.length ? participacionData : fallback).map(item => item.label);
+  const partValues = (participacionData.length ? participacionData : fallback).map(item => item.porcentaje ?? 0);
+  const partColors = [
+    '#1ea86a', '#ff7b54', '#8c6bff', '#ffc857', '#4bb4d8', '#73c69c', '#d774d5', '#2d7ff9', '#e8716d', '#7fbece'
+  ];
+
+  new Chart(document.getElementById('chart-departamentos'), {
+    type: 'bar',
+    data: {
+      labels: deptLabels,
+      datasets: [{
+        label: 'Registros',
+        data: deptValues,
+        backgroundColor: deptValues.map((_, i) => i % 2 === 0 ? C.green : C.purple),
+        borderRadius: 8,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 280 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: context => `${context.parsed.y} registros`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: C.muted, font: { family: 'DM Sans', size: 10 } },
+          grid: { display: false },
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: C.muted },
+          grid: { color: 'rgba(20,42,49,0.06)' }
+        }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('chart-extremos'), {
+    type: 'bar',
+    data: {
+      labels: [...mayorLabels, ...menorLabels],
+      datasets: [
+        {
+          label: 'Mayor cantidad',
+          data: [...mayorValues, ...Array(menorLabels.length).fill(null)],
+          backgroundColor: 'rgba(30, 168, 106, 0.82)',
+          borderRadius: 8,
+        },
+        {
+          label: 'Menor cantidad',
+          data: [...Array(mayorLabels.length).fill(null), ...menorValues],
+          backgroundColor: 'rgba(255, 123, 84, 0.82)',
+          borderRadius: 8,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 280 },
+      plugins: {
+        legend: { position: 'bottom', labels: { color: C.muted, font: { family: 'DM Sans', size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: context => `${context.parsed.y ?? 0} registros`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: C.muted, font: { family: 'DM Sans', size: 10 }, maxRotation: 45 },
+          grid: { display: false },
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: C.muted },
+          grid: { color: 'rgba(20,42,49,0.06)' }
+        }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('chart-participacion'), {
+    type: 'doughnut',
+    data: {
+      labels: partLabels,
+      datasets: [{
+        data: partValues,
+        backgroundColor: partColors,
+        borderColor: '#ffffff',
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '58%',
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: C.muted, font: { family: 'DM Sans', size: 11 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: context => `${context.label}: ${context.parsed}%`
+          }
+        }
+      }
+    }
+  });
+</script>
 {% endblock %}

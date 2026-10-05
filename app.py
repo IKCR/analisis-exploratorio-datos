@@ -3,6 +3,7 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
+
 from flask import Flask, render_template, send_file
 
 app = Flask(__name__)
@@ -78,6 +79,82 @@ def top_municipios(limit=5):
 	]
 
 
+
+
+def territorial_data():
+	rows = load_dataset()
+	if not rows:
+		return {
+			"departamentos": [],
+			"municipios": [],
+			"zonas": [],
+			"participacion_departamentos": [],
+			"extremos_municipios": {"mayores": [], "menores": []},
+		}
+
+	departamento_counts = defaultdict(int)
+	municipio_counts = defaultdict(int)
+	zona_counts = defaultdict(int)
+
+	for row in rows:
+		departamento = (row.get("DEPARTAMENTO") or "").strip()
+		municipio = (row.get("MUNICIPIO") or "").strip()
+		zona = (row.get("ETC") or "").strip()
+
+		if departamento:
+			departamento_counts[departamento] += 1
+		if municipio:
+			municipio_counts[municipio] += 1
+		if zona:
+			zona_counts[zona] += 1
+
+	departamentos = [
+		{"label": label, "valor": valor}
+		for label, valor in sorted(departamento_counts.items(), key=lambda item: (-item[1], item[0]))
+	]
+	municipios = [
+		{"label": label, "valor": valor}
+		for label, valor in sorted(municipio_counts.items(), key=lambda item: (-item[1], item[0]))
+	]
+	zonas = [
+		{"label": label, "valor": valor}
+		for label, valor in sorted(zona_counts.items(), key=lambda item: (-item[1], item[0]))
+	]
+
+	total_registros = sum(item["valor"] for item in departamentos)
+	participacion_departamentos = []
+	for item in departamentos[:8]:
+		participacion_departamentos.append({
+			"label": item["label"],
+			"valor": item["valor"],
+			"porcentaje": round((item["valor"] / total_registros) * 100, 2) if total_registros else 0,
+		})
+	resto = total_registros - sum(item["valor"] for item in participacion_departamentos)
+	if resto > 0:
+		participacion_departamentos.append({
+			"label": "Resto",
+			"valor": resto,
+			"porcentaje": round((resto / total_registros) * 100, 2) if total_registros else 0,
+		})
+
+	mayores = municipios[:8]
+	menores = list(reversed(municipios[-8:])) if len(municipios) > 8 else municipios[:]
+	if len(menores) > 8:
+		menores = menores[:8]
+
+	return {
+		"departamentos": departamentos,
+		"municipios": municipios,
+		"zonas": zonas,
+		"participacion_departamentos": participacion_departamentos,
+		"extremos_municipios": {
+			"mayores": mayores,
+			"menores": menores,
+		},
+	}
+
+
+
 def _build_datos_temporales():
 	global _CACHE_TEMPORAL
 	if _CACHE_TEMPORAL is not None:
@@ -127,6 +204,7 @@ def _build_datos_temporales():
 	return resultado
 
 
+
 @app.route("/")
 def inicio():
 	return render_template("index.html", titulo="Estadísticas en Educación", resumen=dataset_summary())
@@ -151,11 +229,14 @@ def poblacional():
 @app.route("/analisis/territorial")
 def territorial():
 	resumen = dataset_summary()
+	territorios = territorial_data()
 	return render_template(
 		"analisis/territorial.html",
 		titulo="Dimensión territorial",
 		resumen=resumen,
 		top_municipios=top_municipios(),
+		territorios=territorios,
+		territorios_json=json.dumps(territorios, ensure_ascii=False),
 	)
 
 
