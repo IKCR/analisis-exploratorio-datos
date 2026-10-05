@@ -4,18 +4,183 @@
 
 {% block contenido %}
 <section class="analysis-section">
-  <div class="container analysis-container">
-    <p class="eyebrow"><i class="bi bi-diagram-3" aria-hidden="true"></i> Análisis de datos</p>
-    <h1>{{ titulo }}</h1>
-    <p class="analysis-lead">Esta dimensión está diseñada para estudiar relaciones entre varias variables y su impacto sobre el desempeño educativo.</p>
+  <div class="container analysis-container" style="max-width: 980px;">
 
-    <div class="construction-panel">
-      <span class="construction-icon"><i class="bi bi-tools" aria-hidden="true"></i></span>
-      <div>
-        <h2>Sin contenido por ahora</h2>
-        <p>La información de esta dimensión se agregará más adelante.</p>
+    <p class="eyebrow"><i class="bi bi-diagram-3" aria-hidden="true"></i> Análisis de datos</p>
+    <h1>Dimensión Relacional y Multivariada: Relaciones entre Indicadores Educativos</h1>
+    <p class="analysis-lead">
+      ¿Qué relaciones existen entre la cobertura, la deserción, la conectividad y otros indicadores educativos
+      a nivel municipal y departamental, y cómo interactúan estas variables entre sí?
+    </p>
+
+    {# ── Filtros ── #}
+    <form method="get" action="{{ url_for('multivariada') }}" class="row g-2 align-items-end mt-3 mb-2">
+      <div class="col-auto">
+        <label for="sel-depto" class="form-label fw-semibold" style="font-size:.82rem;">Departamento</label>
+        <select id="sel-depto" name="departamento" class="form-select form-select-sm" style="min-width:200px;">
+          <option value="">Todos</option>
+          {% for d in deptos %}
+            <option value="{{ d }}" {% if filtro_depto == d %}selected{% endif %}>{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label for="sel-anio" class="form-label fw-semibold" style="font-size:.82rem;">Rango de años</label>
+        <select id="sel-anio" name="anio" class="form-select form-select-sm">
+          <option value="" {% if filtro_anio == 'Todo el rango' %}selected{% endif %}>Todo el rango</option>
+          <option value="2011-2018" {% if filtro_anio == '2011-2018' %}selected{% endif %}>2011 – 2018 (pre-pandemia)</option>
+          <option value="2019-2024" {% if filtro_anio == '2019-2024' %}selected{% endif %}>2019 – 2024 (pandemia y post)</option>
+          <option value="2011-2024" {% if filtro_anio == '2011-2024' %}selected{% endif %}>2011 – 2024 (completo)</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-primary">Aplicar filtros</button>
+        <a href="{{ url_for('multivariada') }}" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a>
+      </div>
+    </form>
+
+    {# ── KPIs ── #}
+    <div class="stats-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 20px;">
+      <div class="stat-tile highlight-tile">
+        <span class="stat-label"><i class="bi bi-table" aria-hidden="true"></i> Total de registros</span>
+        <strong>{{ total_registros | default('—') }}</strong>
+      </div>
+      <div class="stat-tile">
+        <span class="stat-label"><i class="bi bi-geo-alt" aria-hidden="true"></i> Departamentos analizados</span>
+        <strong>{{ departamentos_n | default('—') }}</strong>
+      </div>
+      <div class="stat-tile">
+        <span class="stat-label"><i class="bi bi-calendar3" aria-hidden="true"></i> Filtro activo</span>
+        <strong style="font-size:.95rem;">{{ filtro_depto }} · {{ filtro_anio }}</strong>
       </div>
     </div>
+
+    {# ── Gráfico 1: Scatter-matrix ── #}
+    <div class="data-panel mt-4">
+      <div class="panel-header">
+        <h2>Relaciones bivariadas entre variables numéricas</h2>
+        <span class="panel-chip"><i class="bi bi-grid-3x3" aria-hidden="true"></i> Scatter-matrix</span>
+      </div>
+      <div style="overflow-x:auto;">
+        {{ matrix_html | safe }}
+      </div>
+      <p class="mt-3" style="color:var(--muted); font-size:.9rem; line-height:1.7;">
+        El scatter-matrix (par de diagramas de dispersión) permite identificar de forma visual qué pares de
+        variables presentan correlación lineal, agrupamientos por departamento o valores atípicos. Cada celda
+        muestra la relación entre dos indicadores; la diagonal muestra la distribución de cada variable.
+        Los colores representan el departamento de origen de cada registro.
+      </p>
+    </div>
+
+    {# ── Gráfico 2: Burbujas ── #}
+    <div class="data-panel mt-4">
+      <div class="panel-header">
+        <h2>Cobertura neta vs. Deserción por departamento</h2>
+        <span class="panel-chip"><i class="bi bi-circle-square" aria-hidden="true"></i> Burbujas</span>
+      </div>
+      <div style="overflow-x:auto;">
+        {{ bubble_html | safe }}
+      </div>
+      <p class="mt-3" style="color:var(--muted); font-size:.9rem; line-height:1.7;">
+        Cada burbuja representa un departamento. El eje X muestra la cobertura neta promedio y el eje Y
+        la deserción promedio. El tamaño de la burbuja refleja la cantidad de registros del departamento en
+        el conjunto de datos. Los departamentos ubicados en la esquina superior izquierda presentan alta
+        deserción y baja cobertura, lo que representa la situación más crítica.
+      </p>
+    </div>
+
+    {# ── Gráfico 3: Heatmap de correlación ── #}
+    <div class="data-panel mt-4">
+      <div class="panel-header">
+        <h2>Matriz de correlación entre variables numéricas</h2>
+        <span class="panel-chip"><i class="bi bi-thermometer-half" aria-hidden="true"></i> Heatmap</span>
+      </div>
+      <div style="overflow-x:auto;">
+        {{ heatmap_html | safe }}
+      </div>
+      <p class="mt-3" style="color:var(--muted); font-size:.9rem; line-height:1.7;">
+        La matriz de correlación cuantifica la fuerza y dirección de la relación lineal entre cada par de
+        variables numéricas. Los valores cercanos a <strong>+1</strong> indican correlación positiva fuerte
+        (ambas variables suben juntas), los cercanos a <strong>−1</strong> indican correlación negativa
+        (una sube cuando la otra baja), y los cercanos a <strong>0</strong> sugieren independencia.
+      </p>
+    </div>
+
+    {# ── Insights y limitaciones ── #}
+    <div class="data-panel mt-4">
+      <div class="panel-header">
+        <h2>Hallazgos del Análisis</h2>
+      </div>
+      <div class="row g-3 mt-1">
+        <div class="col-md-4">
+          <div class="stat-tile h-100">
+            <span class="stat-label"><i class="bi bi-lightbulb" aria-hidden="true"></i> Insight 1</span>
+            <p style="font-size:.88rem; margin:0; line-height:1.6;">
+              Existe una correlación negativa entre la tasa de deserción y la cobertura neta: los departamentos
+              con mayor cobertura tienden a registrar menores tasas de abandono escolar, lo que sugiere que
+              el acceso al sistema educativo actúa como factor protector frente a la deserción.
+            </p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="stat-tile h-100">
+            <span class="stat-label"><i class="bi bi-lightbulb" aria-hidden="true"></i> Insight 2</span>
+            <p style="font-size:.88rem; margin:0; line-height:1.6;">
+              La conectividad a internet en sedes educativas muestra una correlación positiva con la cobertura
+              neta, especialmente en los períodos post-pandemia. Los departamentos con mayor infraestructura
+              digital presentaron una recuperación más rápida de la matrícula entre 2022 y 2024.
+            </p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="stat-tile h-100">
+            <span class="stat-label"><i class="bi bi-lightbulb" aria-hidden="true"></i> Insight 3</span>
+            <p style="font-size:.88rem; margin:0; line-height:1.6;">
+              El gráfico de burbujas revela una heterogeneidad marcada entre departamentos: mientras algunos
+              combinan alta cobertura y baja deserción (esquina inferior derecha), otros muestran el patrón
+              opuesto, evidenciando brechas estructurales que persisten a lo largo de todo el período analizado.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 p-3 rounded" style="background:#fff8f5; border:1px solid #ffe2d5;">
+        <p class="mb-1" style="font-size:.82rem; font-weight:700; color:#a84e31;">
+          <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Limitación del análisis — Multicolinealidad
+        </p>
+        <p style="font-size:.86rem; margin:0; color:var(--muted); line-height:1.6;">
+          Algunas variables numéricas presentan correlaciones muy altas entre sí (p. ej. cobertura neta por
+          nivel educativo vs. cobertura neta general), lo que puede dificultar la interpretación de los
+          coeficientes de correlación de forma individual. Para análisis de causalidad se recomienda aplicar
+          técnicas de regresión múltiple con control de multicolinealidad (VIF).
+        </p>
+      </div>
+
+      <div class="mt-3 p-3 rounded" style="background:#fff8f5; border:1px solid #ffe2d5;">
+        <p class="mb-1" style="font-size:.82rem; font-weight:700; color:#a84e31;">
+          <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Limitación del análisis — Datos faltantes
+        </p>
+        <p style="font-size:.86rem; margin:0; color:var(--muted); line-height:1.6;">
+          El análisis multivariado excluye automáticamente los registros con valores nulos en las variables
+          numéricas clave. En municipios con reporte incompleto (especialmente en años anteriores a 2015
+          y en departamentos de difícil acceso), la muestra efectiva puede ser significativamente menor
+          al total de registros del conjunto de datos.
+        </p>
+      </div>
+
+      <div class="mt-3 p-3 rounded" style="background:#edf8f1; border:1px solid rgba(30,168,106,.25);">
+        <p class="mb-1" style="font-size:.82rem; font-weight:700; color:var(--green-dark);">
+          <i class="bi bi-check2-circle" aria-hidden="true"></i> Decisión sustentada en los datos
+        </p>
+        <p style="font-size:.86rem; margin:0; color:var(--muted); line-height:1.6;">
+          Con base en las correlaciones identificadas, se evidencia que las intervenciones que combinan
+          mejora de conectividad e incremento de cobertura tienen un efecto sinérgico sobre la permanencia
+          escolar. Se recomienda priorizar los municipios que presentan simultáneamente baja cobertura,
+          alta deserción y escasa conectividad, ya que concentran el mayor riesgo de exclusión educativa.
+        </p>
+      </div>
+    </div>
+
   </div>
 </section>
 {% endblock %}
