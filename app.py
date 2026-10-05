@@ -35,6 +35,30 @@ def load_dataset():
 	with DATASET_PATH.open("r", encoding="utf-8-sig", newline="") as archivo:
 		return list(csv.DictReader(archivo))
 
+def load_dataframe() -> pd.DataFrame:
+    """Load the dataset using pandas and normalise numeric columns.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with cleaned numeric columns.
+    """
+    df = pd.read_csv(DATASET_PATH, encoding="utf-8-sig")
+    # Columns that may contain percentages or formatted numbers
+    numeric_cols = ["TASA_MATRICULACIÓN_5_16", "INGRESO_PROMEDIO"]
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = (
+                df[col]
+                .astype(str)
+                .str.replace("%", "", regex=False)
+                .str.replace(".", "", regex=False)
+                .str.replace(",", ".", regex=False)
+                .replace({"": "0", "nan": "0"}, regex=True)
+                .astype(float)
+            )
+    return df
+
 
 def dataset_summary():
 	rows = load_dataset()
