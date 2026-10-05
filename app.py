@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.express as px
 
 
-from flask import Flask, render_template, send_file
+from flask import Flask, render_template, request, send_file
 
 app = Flask(__name__)
 
@@ -154,7 +154,132 @@ def _build_datos_temporales():
 	return resultado
 
 
+def multivariate_metrics(df: pd.DataFrame, dep_filter=None, year_range=None) -> dict:
+    """Compute multivariate metrics and build Plotly HTML charts.
+
+    Parameters
+    ----------
+    df         : DataFrame returned by load_dataframe().
+    dep_filter : Optional department name to filter rows.
+    year_range : Optional (start, end) year tuple (inclusive).
+
+    Returns
+    -------
+    dict with keys: matrix_html, bubble_html, heatmap_html,
+                    total_registros, departamentos, anios_disponibles.
+    """
+    # ── 1. Apply optional filters ──────────────────────────────────────────
+    if dep_filter:
+        df = df[df["DEPARTAMENTO"].str.strip().str.upper() == dep_filter.upper()]
+    if year_range and "AÑO" in df.columns:
+        start, end = year_range
+        df = df[(df["AÑO"] >= start) & (df["AÑO"] <= end)]
+
+    # ── 2. Summary metrics ─────────────────────────────────────────────────
+    total_registros = int(df.shape[0])
+    departamentos_n = int(df["DEPARTAMENTO"].nunique()) if "DEPARTAMENTO" in df.columns else 0
+    anios_disponibles = (
+        sorted(df["AÑO"].dropna().unique().tolist()) if "AÑO" in df.columns else []
+    )
+
+    # ── 3. Numeric columns present in this DataFrame ───────────────────────
+    candidatas = [
+        "TASA_MATRICULACIÓN_5_16",
+        "COBERTURA_NETA",
+        "DESERCIÓN",
+        "COBERTURA_NETA_PRIMARIA",
+        "COBERTURA_NETA_SECUNDARIA",
+        "COBERTURA_NETA_MEDIA",
+        "SEDES_CONECTADAS_A_INTERNET",
+    ]
+    numeric_vars = [c for c in candidatas if c in df.columns]
+
+    # Convert those columns to numeric (ignore errors for safety)
+    for col in numeric_vars:
+        df[col] = pd.to_numeric(
+            df[col].astype(str)
+            .str.replace("%", "", regex=False)
+            .str.replace(".", "", regex=False)
+            .str.replace(",", ".", regex=False),
+            errors="coerce",
+        )
+    df_num = df[numeric_vars].dropna(how="all")
+
+    # ── 4. Scatter-matrix (pair-plot) ──────────────────────────────────────
+    if len(numeric_vars) >= 2 and not df_num.empty:
+        color_col = "DEPARTAMENTO" if "DEPARTAMENTO" in df.columns else None
+        fig_matrix = px.scatter_matrix(
+            df,
+            dimensions=numeric_vars,
+            color=color_col,
+            title="Relaciones bivariadas entre variables numéricas",
+            labels={c: c.replace("_", " ").title() for c in numeric_vars},
+        )
+        fig_matrix.update_layout(height=620)
+        fig_matrix.update_traces(diagonal_visible=False, showupperhalf=False)
+        matrix_html = fig_matrix.to_html(full_html=False, include_plotlyjs="cdn")
+    else:
+        matrix_html = "<p class='text-warning'>No hay suficientes columnas numéricas para el scatter-matrix.</p>"
+
+    # ── 5. Bubble chart: cobertura vs deserción por departamento ───────────
+    if "DEPARTAMENTO" in df.columns and "COBERTURA_NETA" in df.columns and "DESERCIÓN" in df.columns:
+        agg = (
+            df.groupby("DEPARTAMENTO")
+            .agg(
+                cobertura=("COBERTURA_NETA", "mean"),
+                desercion=("DESERCIÓN", "mean"),
+                registros=("MUNICIPIO", "count"),
+            )
+            .reset_index()
+            .dropna(subset=["cobertura", "desercion"])
+        )
+        if not agg.empty:
+            fig_bubble = px.scatter(
+                agg,
+                x="cobertura",
+                y="desercion",
+                size="registros",
+                color="DEPARTAMENTO",
+                hover_name="DEPARTAMENTO",
+                title="Cobertura neta vs Deserción por departamento (tamaño = nº registros)",
+                labels={"cobertura": "Cobertura neta (%)", "desercion": "Deserción (%)"},
+            )
+            fig_bubble.update_layout(height=500, showlegend=False)
+            bubble_html = fig_bubble.to_html(full_html=False, include_plotlyjs=False)
+        else:
+            bubble_html = "<p class='text-warning'>No hay datos suficientes para el gráfico de burbujas.</p>"
+    else:
+        bubble_html = "<p class='text-warning'>Columnas requeridas para el gráfico de burbujas no encontradas.</p>"
+
+    # ── 6. Correlation heatmap ─────────────────────────────────────────────
+    if len(numeric_vars) >= 2 and not df_num.empty:
+        corr = df_num.corr(numeric_only=True)
+        fig_heat = px.imshow(
+            corr,
+            text_auto=".2f",
+            aspect="auto",
+            color_continuous_scale="RdBu_r",
+            zmin=-1, zmax=1,
+            title="Matriz de correlación entre variables numéricas",
+            labels={"color": "Correlación"},
+        )
+        fig_heat.update_layout(height=480)
+        heatmap_html = fig_heat.to_html(full_html=False, include_plotlyjs=False)
+    else:
+        heatmap_html = "<p class='text-warning'>No hay suficientes columnas numéricas para la heatmap.</p>"
+
+    return {
+        "matrix_html": matrix_html,
+        "bubble_html": bubble_html,
+        "heatmap_html": heatmap_html,
+        "total_registros": total_registros,
+        "departamentos": departamentos_n,
+        "anios_disponibles": anios_disponibles,
+    }
+
+
 @app.route("/")
+
 def inicio():
 	return render_template("index.html", titulo="Estadísticas en Educación", resumen=dataset_summary())
 
@@ -200,10 +325,49 @@ def temporal():
 
 @app.route("/analisis/multivariada")
 def multivariada():
-	return render_template(
-		"analisis/multivariada.html",
-		titulo="Dimensión multivariada",
-	)
+    """Render the multivariate analysis page.
+
+    Supports optional URL query parameters:
+        ?departamento=ANTIOQUIA   – filter by department (case-insensitive)
+        ?anio=2015-2022           – filter by year range (inclusive)
+    """
+    # Read optional filter params from the URL
+    dep = request.args.get("departamento", "").strip() or None
+    anio_param = request.args.get("anio", "").strip() or None
+    year_range = None
+    if anio_param:
+        try:
+            start, end = map(int, anio_param.split("-"))
+            year_range = (start, end)
+        except (ValueError, AttributeError):
+            year_range = None
+
+    # Load data and compute metrics / charts
+    df = load_dataframe()
+
+    # Build list of unique departments for the filter dropdown
+    deptos = (
+        sorted(df["DEPARTAMENTO"].dropna().unique().tolist())
+        if "DEPARTAMENTO" in df.columns
+        else []
+    )
+
+    metrics = multivariate_metrics(df.copy(), dep_filter=dep, year_range=year_range)
+
+    return render_template(
+        "analisis/multivariada.html",
+        titulo="Dimensión multivariada",
+        matrix_html=metrics["matrix_html"],
+        bubble_html=metrics["bubble_html"],
+        heatmap_html=metrics["heatmap_html"],
+        total_registros=metrics["total_registros"],
+        departamentos_n=metrics["departamentos"],
+        anios_disponibles=metrics["anios_disponibles"],
+        deptos=deptos,
+        filtro_depto=dep or "Todos",
+        filtro_anio=anio_param or "Todo el rango",
+    )
+
 
 
 if __name__ == "__main__":
