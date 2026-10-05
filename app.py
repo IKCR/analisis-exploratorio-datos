@@ -154,6 +154,161 @@ def territorial_data():
 	}
 
 
+def territorial_population_data():
+	rows = load_dataset()
+	years = [
+		int(row["AÑO"])
+		for row in rows
+		if (row.get("AÑO") or "").strip().isdigit()
+	]
+	if not years:
+		return {
+			"anio": None,
+			"total_poblacion": 0,
+			"departamentos": [],
+			"diferencias": [],
+			"zonas_particulares": [],
+			"top_tres": [],
+			"participacion_top_tres": 0,
+			"promedios": {},
+		}
+
+	anio = max(years)
+	rows = [row for row in rows if row.get("AÑO") == str(anio)]
+	departamentos = defaultdict(lambda: {
+		"poblacion": 0,
+		"cobertura": 0.0,
+		"matriculacion": 0.0,
+		"desercion": 0.0,
+		"aprobacion": 0.0,
+		"repitencia": 0.0,
+		"weight_cobertura": 0.0,
+		"weight_matriculacion": 0.0,
+		"weight_desercion": 0.0,
+		"weight_aprobacion": 0.0,
+		"weight_repitencia": 0.0,
+	})
+	zonas = defaultdict(lambda: {
+		"poblacion": 0,
+		"desercion": 0.0,
+		"cobertura": 0.0,
+		"weight_desercion": 0.0,
+		"weight_cobertura": 0.0,
+		"registros": 0,
+	})
+	total_poblacion = 0
+	totales = defaultdict(float)
+	pesos = defaultdict(float)
+
+	indicadores = {
+		"cobertura": "COBERTURA_NETA",
+		"matriculacion": "TASA_MATRICULACIÓN_5_16",
+		"desercion": "DESERCIÓN",
+		"aprobacion": "APROBACIÓN",
+		"repitencia": "REPITENCIA",
+	}
+	for row in rows:
+		poblacion = _to_float(row.get("POBLACIÓN_5_16"))
+		departamento = (row.get("DEPARTAMENTO") or "").strip()
+		zona = (row.get("ETC") or "").strip()
+		if departamento:
+			grupo = departamentos[departamento]
+			grupo["poblacion"] += poblacion
+			for clave, columna in indicadores.items():
+				valor = row.get(columna)
+				if valor is not None and str(valor).strip():
+					numero = _to_float(valor)
+					grupo[clave] += numero * poblacion
+					grupo[f"weight_{clave}"] += poblacion
+					totales[clave] += numero * poblacion
+					pesos[clave] += poblacion
+			total_poblacion += poblacion
+
+		if zona:
+			grupo_zona = zonas[zona]
+			grupo_zona["poblacion"] += poblacion
+			grupo_zona["registros"] += 1
+			for clave, columna in (("cobertura", "COBERTURA_NETA"), ("desercion", "DESERCIÓN")):
+				valor = row.get(columna)
+				if valor is not None and str(valor).strip():
+					grupo_zona[clave] += _to_float(valor) * poblacion
+					grupo_zona[f"weight_{clave}"] += poblacion
+
+	def promedio_ponderado(grupo, clave):
+		peso = grupo[f"weight_{clave}"]
+		return round(grupo[clave] / peso, 2) if peso else None
+
+	departamentos_ordenados = sorted(
+		departamentos.items(),
+		key=lambda item: (-item[1]["poblacion"], item[0]),
+	)
+	top_departamentos = [
+		{
+			"label": nombre,
+			"poblacion": grupo["poblacion"],
+			"porcentaje": round(grupo["poblacion"] / total_poblacion * 100, 2) if total_poblacion else 0,
+		}
+		for nombre, grupo in departamentos_ordenados[:8]
+	]
+	poblacion_resto = total_poblacion - sum(item["poblacion"] for item in top_departamentos)
+	if poblacion_resto > 0:
+		top_departamentos.append({
+			"label": "Resto de departamentos",
+			"poblacion": poblacion_resto,
+			"porcentaje": round(poblacion_resto / total_poblacion * 100, 2),
+		})
+	top_tres = top_departamentos[:3]
+
+	diferencias = [
+		{
+			"label": nombre,
+			"poblacion": grupo["poblacion"],
+			"cobertura": promedio_ponderado(grupo, "cobertura"),
+			"matriculacion": promedio_ponderado(grupo, "matriculacion"),
+		}
+		for nombre, grupo in departamentos_ordenados[:10]
+	]
+
+	zonas_con_indicadores = []
+	for nombre, grupo in zonas.items():
+		cobertura = promedio_ponderado(grupo, "cobertura")
+		desercion = promedio_ponderado(grupo, "desercion")
+		if cobertura is not None and desercion is not None:
+			zonas_con_indicadores.append({
+				"label": nombre,
+				"poblacion": grupo["poblacion"],
+				"registros": grupo["registros"],
+				"cobertura": cobertura,
+				"desercion": desercion,
+			})
+
+	seleccionadas = []
+	for clave, reverse in (("desercion", True), ("cobertura", False), ("cobertura", True)):
+		candidata = sorted(
+			zonas_con_indicadores,
+			key=lambda zona: zona[clave],
+			reverse=reverse,
+		)[0] if zonas_con_indicadores else None
+		if candidata and candidata not in seleccionadas:
+			seleccionadas.append(candidata)
+
+	return {
+		"anio": anio,
+		"total_poblacion": int(total_poblacion),
+		"departamentos": top_departamentos,
+		"diferencias": diferencias,
+		"zonas_particulares": seleccionadas,
+		"top_tres": top_tres,
+		"participacion_top_tres": round(
+			sum(item["porcentaje"] for item in top_tres),
+			2,
+		),
+		"promedios": {
+			clave: round(totales[clave] / pesos[clave], 2) if pesos[clave] else None
+			for clave in indicadores
+		},
+	}
+
 
 def _build_datos_temporales():
 	global _CACHE_TEMPORAL
@@ -230,6 +385,7 @@ def poblacional():
 def territorial():
 	resumen = dataset_summary()
 	territorios = territorial_data()
+	poblacion_territorial = territorial_population_data()
 	return render_template(
 		"analisis/territorial.html",
 		titulo="Dimensión territorial",
@@ -237,6 +393,8 @@ def territorial():
 		top_municipios=top_municipios(),
 		territorios=territorios,
 		territorios_json=json.dumps(territorios, ensure_ascii=False),
+		poblacion_territorial=poblacion_territorial,
+		poblacion_territorial_json=json.dumps(poblacion_territorial, ensure_ascii=False),
 	)
 
 

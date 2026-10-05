@@ -477,6 +477,141 @@ h1, h2, h3 { color: var(--ink); font-family: var(--font-display); font-weight: 8
   height: 250px;
 }
 
+.territorial-chart-tall {
+  height: 340px;
+}
+
+.territorial-chart-compact {
+  height: 220px;
+}
+
+.map-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.territorial-map {
+  display: flex;
+  width: 100%;
+  height: 460px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #e8eef6;
+}
+
+.territorial-map > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.territorial-map > svg > rect {
+  fill: #e8eef6;
+}
+
+.map-info-panel {
+  display: flex;
+  min-width: 0;
+  min-height: 180px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--green);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgb(23 59 59 / 5%);
+}
+
+.map-info-label {
+  color: var(--muted);
+  font-size: .76rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.map-info-label i {
+  margin-right: 5px;
+  color: var(--green);
+}
+
+.map-info-panel strong {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.map-info-value {
+  color: var(--green-dark);
+  font-size: .92rem;
+  font-weight: 700;
+}
+
+.map-status {
+  display: grid;
+  height: 100%;
+  margin: 0;
+  place-items: center;
+  color: var(--muted);
+  font-size: .9rem;
+  text-align: center;
+}
+
+.map-status-error {
+  padding: 20px;
+  color: #a84e31;
+}
+
+.map-marker {
+  cursor: pointer;
+  outline: none;
+}
+
+.map-marker-hit-area {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.map-marker-dot {
+  fill: var(--green-dark);
+  stroke: #ffffff;
+  stroke-width: 1.5px;
+  transition: fill .15s ease;
+}
+
+.map-marker:hover .map-marker-dot,
+.map-marker:focus .map-marker-dot {
+  fill: var(--coral);
+}
+
+.map-legend {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: .82rem;
+}
+
+.map-legend-dot {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: var(--green-dark);
+  box-shadow: 0 0 0 1px var(--green-dark);
+}
+
 .panel-header {
   display: flex;
   align-items: center;
@@ -560,6 +695,17 @@ h1, h2, h3 { color: var(--ink); font-family: var(--font-display); font-weight: 8
   .territorial-chart-wide { grid-column: auto; }
   .territorial-chart-canvas,
   .territorial-chart-doughnut { height: 220px; }
+  .territorial-chart-tall { height: 330px; }
+  .territorial-chart-compact { height: 210px; }
+  .map-layout { grid-template-columns: minmax(0, 1fr) 190px; gap: 12px; }
+  .territorial-map { height: 380px; }
+  .map-info-panel { padding: 15px; }
+}
+
+@media (max-width: 575.98px) {
+  .map-layout { grid-template-columns: minmax(0, 1fr); }
+  .territorial-map { height: 340px; }
+  .map-info-panel { min-height: 110px; }
   .footer-content { align-items: flex-start; flex-direction: column; gap: 7px; }
 }
 

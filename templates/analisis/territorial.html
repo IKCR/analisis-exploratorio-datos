@@ -27,18 +27,103 @@
       </div>
     </div>
 
+    <div class="data-panel mt-4">
+      <div class="panel-header">
+        <h2>¿Cómo se distribuye la población y sus principales características entre los territorios disponibles?</h2>
+        <span class="panel-chip"><i class="bi bi-people" aria-hidden="true"></i> Corte {{ poblacion_territorial.anio or 'sin datos' }}</span>
+      </div>
+      {% if poblacion_territorial.total_poblacion %}
+        <p style="color:var(--muted); font-size:.95rem; line-height:1.75; margin:0;">
+          En {{ poblacion_territorial.anio }}, el conjunto registra
+          <strong>{{ "{:,}".format(poblacion_territorial.total_poblacion) }}</strong> personas de 5 a 16 años.
+          La mayor concentración está en
+          {% for item in poblacion_territorial.top_tres %}
+            <strong>{{ item.label }}</strong> ({{ item.porcentaje }}%){% if not loop.last %}, {% endif %}
+          {% endfor %}; en conjunto representan el {{ poblacion_territorial.participacion_top_tres }}% de la población reportada.
+          Los promedios ponderados por población son {{ poblacion_territorial.promedios.matriculacion }}% de matriculación,
+          {{ poblacion_territorial.promedios.cobertura }}% de cobertura neta, {{ poblacion_territorial.promedios.aprobacion }}% de aprobación,
+          {{ poblacion_territorial.promedios.desercion }}% de deserción y {{ poblacion_territorial.promedios.repitencia }}% de repitencia.
+          Estas cifras resumen diferencias de escala y desempeño entre territorios; no implican por sí solas una explicación causal.
+        </p>
+      {% else %}
+        <p style="color:var(--muted); font-size:.95rem; line-height:1.75; margin:0;">
+          No hay datos poblacionales suficientes para describir la distribución territorial.
+        </p>
+      {% endif %}
+      <p class="mt-2 mb-0" style="color:var(--muted); font-size:.82rem; line-height:1.6;">
+        Población corresponde al grupo de 5 a 16 años. Las tasas se ponderan por esa población y usan únicamente el corte anual más reciente;
+        los resultados dependen de la cobertura y calidad de los registros disponibles.
+      </p>
+    </div>
+
     <div class="territorial-charts">
       <div class="data-panel territorial-chart-panel territorial-chart-wide">
         <div class="panel-header">
-          <h2>Distribución por departamento</h2>
-          <span class="panel-chip"><i class="bi bi-bar-chart" aria-hidden="true"></i> Frecuencia</span>
+          <h2>Concentraciones territoriales de población</h2>
+          <span class="panel-chip"><i class="bi bi-people-fill" aria-hidden="true"></i> Población de 5 a 16 años</span>
         </div>
-        <div class="territorial-chart-canvas">
-          <canvas id="chart-departamentos"></canvas>
+        <div class="territorial-chart-canvas territorial-chart-tall">
+          <canvas id="chart-concentracion"></canvas>
         </div>
-        <p class="mt-3" style="color:var(--muted); font-size:.9rem; line-height:1.7;">
-          La concentración de registros se presenta primero por departamento, lo que ayuda a reconocer cuáles son las
-          unidades administrativas con mayor volumen de observaciones y dónde se concentra el mayor peso del análisis.
+        <p class="mt-3 mb-0" style="color:var(--muted); font-size:.88rem; line-height:1.65;">
+          Se muestran los ocho departamentos con más población registrada y el agregado del resto, para distinguir concentración
+          de dispersión sin ocultar a los territorios de menor tamaño.
+        </p>
+      </div>
+
+      <div class="data-panel territorial-chart-panel">
+        <div class="panel-header">
+          <h2>Diferencias entre territorios</h2>
+          <span class="panel-chip"><i class="bi bi-bar-chart-steps" aria-hidden="true"></i> Tasas (%)</span>
+        </div>
+        <div class="territorial-chart-canvas territorial-chart-tall">
+          <canvas id="chart-diferencias"></canvas>
+        </div>
+        <p class="mt-3 mb-0" style="color:var(--muted); font-size:.88rem; line-height:1.65;">
+          Comparación de matriculación y cobertura neta en los diez departamentos con más población escolar.
+        </p>
+      </div>
+
+      <div class="data-panel territorial-chart-panel">
+        <div class="panel-header">
+          <h2>Comportamientos particulares de algunas zonas</h2>
+          <span class="panel-chip"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> Valores extremos</span>
+        </div>
+        <div class="territorial-chart-canvas territorial-chart-compact">
+          <canvas id="chart-zonas"></canvas>
+        </div>
+        <p class="mt-3 mb-0" style="color:var(--muted); font-size:.88rem; line-height:1.65;">
+          Se destacan las zonas ETC con mayor deserción y con los extremos de cobertura neta del corte. ETC es la unidad
+          reportada por la fuente y puede representar escalas administrativas distintas. Una cobertura superior al 100% es
+          una tasa reportada —no una proporción literal de personas— y debe interpretarse con contexto local.
+        </p>
+      </div>
+    </div>
+
+    <div class="territorial-charts">
+      <div class="data-panel territorial-chart-panel territorial-chart-wide">
+        <div class="panel-header">
+          <h2>Distribución territorial de los registros</h2>
+          <span class="panel-chip"><i class="bi bi-geo-alt" aria-hidden="true"></i> Mapa departamental</span>
+        </div>
+        <div class="map-layout">
+          <div id="map-departamentos" class="territorial-map" role="region" aria-label="Mapa de Colombia con un punto por cada departamento con datos">
+            <p id="mapa-cargando" class="map-status">Cargando mapa de departamentos…</p>
+          </div>
+          <aside id="mapa-detalle" class="map-info-panel" aria-live="polite" aria-atomic="true">
+            <span class="map-info-label"><i class="bi bi-cursor" aria-hidden="true"></i> Territorio</span>
+            <strong id="mapa-detalle-nombre">Explora el mapa</strong>
+            <span id="mapa-detalle-registros" class="map-info-value">Pasa el cursor sobre un punto</span>
+          </aside>
+        </div>
+        <div class="map-legend" aria-label="Leyenda del mapa">
+          <span class="map-legend-dot" aria-hidden="true"></span>
+          <span>Los puntos indican departamentos con datos. Pasa el cursor o enfoca uno para ver el detalle en la barra lateral.</span>
+        </div>
+        <p class="mt-2 mb-0" style="color:var(--muted); font-size:.82rem; line-height:1.6;">
+          Límites departamentales: <a href="https://www.geoboundaries.org/" target="_blank" rel="noopener noreferrer">geoBoundaries</a>
+          (OpenStreetMap/Wambacher, <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener noreferrer">licencia ODbL 1.0</a>).
+          Los registros se agregan por nombre de departamento; el total nacional no se representa como departamento.
         </p>
       </div>
 
@@ -77,6 +162,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
   const TERRITORIO = {{ territorios_json|safe }};
+  const POBLACION_TERRITORIAL = {{ poblacion_territorial_json|safe }};
   const C = {
     green: '#1ea86a',
     coral: '#ff7b54',
@@ -84,15 +170,11 @@
     muted: '#5d7380'
   };
 
-  const departamentoData = (TERRITORIO.departamentos || []).slice(0, 10);
   const mayorMunicipios = (TERRITORIO.extremos_municipios && TERRITORIO.extremos_municipios.mayores) || [];
   const menorMunicipios = (TERRITORIO.extremos_municipios && TERRITORIO.extremos_municipios.menores) || [];
   const participacionData = (TERRITORIO.participacion_departamentos || []).slice(0, 8);
 
   const fallback = [{ label: 'Sin datos', valor: 0 }];
-  const deptLabels = (departamentoData.length ? departamentoData : fallback).map(item => item.label);
-  const deptValues = (departamentoData.length ? departamentoData : fallback).map(item => item.valor);
-
   const mayorLabels = (mayorMunicipios.length ? mayorMunicipios : fallback).map(item => item.label);
   const mayorValues = (mayorMunicipios.length ? mayorMunicipios : fallback).map(item => item.valor);
   const menorLabels = (menorMunicipios.length ? menorMunicipios : fallback).map(item => item.label);
@@ -103,41 +185,230 @@
   const partColors = [
     '#1ea86a', '#ff7b54', '#8c6bff', '#ffc857', '#4bb4d8', '#73c69c', '#d774d5', '#2d7ff9', '#e8716d', '#7fbece'
   ];
+  const populationFallback = [{ label: 'Sin datos', poblacion: 0, porcentaje: 0 }];
+  const populationDepartments = POBLACION_TERRITORIAL.departamentos || [];
+  const comparisonDepartments = POBLACION_TERRITORIAL.diferencias || [];
+  const unusualZones = POBLACION_TERRITORIAL.zonas_particulares || [];
 
-  new Chart(document.getElementById('chart-departamentos'), {
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const mapContainer = document.getElementById('map-departamentos');
+  const mapDetailName = document.getElementById('mapa-detalle-nombre');
+  const mapDetailRecords = document.getElementById('mapa-detalle-registros');
+
+  function showMapDetails(name, count) {
+    mapDetailName.textContent = name;
+    mapDetailRecords.textContent = `${count.toLocaleString('es-CO')} registros`;
+  }
+
+  function resetMapDetails() {
+    mapDetailName.textContent = 'Explora el mapa';
+    mapDetailRecords.textContent = 'Pasa el cursor sobre un punto';
+  }
+
+  function getMapMarker(target) {
+    return target instanceof Element ? target.closest('.map-marker') : null;
+  }
+
+  mapContainer.addEventListener('pointerover', event => {
+    const marker = getMapMarker(event.target);
+    if (marker && !marker.contains(event.relatedTarget)) {
+      showMapDetails(marker.dataset.department, Number(marker.dataset.count));
+    }
+  });
+  mapContainer.addEventListener('pointerout', event => {
+    const marker = getMapMarker(event.target);
+    if (marker && !marker.contains(event.relatedTarget)) resetMapDetails();
+  });
+  mapContainer.addEventListener('focusin', event => {
+    const marker = getMapMarker(event.target);
+    if (marker) showMapDetails(marker.dataset.department, Number(marker.dataset.count));
+  });
+  mapContainer.addEventListener('focusout', event => {
+    const marker = getMapMarker(event.target);
+    if (marker && !marker.contains(event.relatedTarget)) resetMapDetails();
+  });
+
+  function normalizeDepartmentName(name) {
+    const normalized = String(name)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+    return normalized === 'bogotacapitaldistrict' ? 'bogotadc' : normalized;
+  }
+
+  function makeSvgElement(name, attributes) {
+    const element = document.createElementNS(SVG_NS, name);
+    Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, value));
+    return element;
+  }
+
+  function addMapMarker(anchor, name, count) {
+    const x = Number(anchor.dataset.x);
+    const y = Number(anchor.dataset.y);
+
+    const marker = makeSvgElement('g', {
+      class: 'map-marker',
+      tabindex: '0',
+      role: 'button',
+      'aria-label': `${name}, ${count.toLocaleString('es-CO')} registros`,
+      'data-department': name,
+      'data-count': count,
+    });
+    const hitArea = makeSvgElement('circle', {
+      cx: x,
+      cy: y,
+      r: 7,
+      class: 'map-marker-hit-area',
+    });
+    marker.appendChild(makeSvgElement('circle', {
+      cx: x,
+      cy: y,
+      r: 4.5,
+      class: 'map-marker-dot',
+    }));
+    marker.insertBefore(hitArea, marker.firstChild);
+    anchor.replaceWith(marker);
+  }
+
+  fetch('{{ url_for("static", filename="img/colombia_departamentos.svg") }}?v=2')
+    .then(response => {
+      if (!response.ok) throw new Error(`No se pudo cargar el mapa (${response.status})`);
+      return response.text();
+    })
+    .then(svgText => {
+      const mapDocument = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+      if (mapDocument.querySelector('parsererror')) throw new Error('El archivo del mapa no es un SVG válido');
+
+      mapDocument.querySelectorAll('g > circle').forEach(circle => {
+        circle.parentElement.remove();
+      });
+
+      const recordsByDepartment = new Map();
+      (TERRITORIO.departamentos || []).forEach(({ label, valor }) => {
+        const key = normalizeDepartmentName(label);
+        if (key !== 'nacional') {
+          recordsByDepartment.set(key, (recordsByDepartment.get(key) || 0) + valor);
+        }
+      });
+
+      mapDocument.querySelectorAll('.department-anchor').forEach(anchor => {
+        const name = anchor.dataset.department;
+        const count = recordsByDepartment.get(normalizeDepartmentName(name));
+        if (Number.isFinite(count) && count > 0) {
+          addMapMarker(anchor, name, count);
+        } else {
+          anchor.remove();
+        }
+      });
+
+      mapContainer.replaceChildren(document.importNode(mapDocument.documentElement, true));
+    })
+    .catch(error => {
+      const status = document.getElementById('mapa-cargando');
+      status.textContent = 'No fue posible cargar el mapa departamental.';
+      status.classList.add('map-status-error');
+      console.error('Error al cargar el mapa departamental:', error);
+    });
+
+  new Chart(document.getElementById('chart-concentracion'), {
     type: 'bar',
     data: {
-      labels: deptLabels,
+      labels: (populationDepartments.length ? populationDepartments : populationFallback).map(item => item.label),
       datasets: [{
-        label: 'Registros',
-        data: deptValues,
-        backgroundColor: deptValues.map((_, i) => i % 2 === 0 ? C.green : C.purple),
-        borderRadius: 8,
+        label: 'Población de 5 a 16 años',
+        data: (populationDepartments.length ? populationDepartments : populationFallback).map(item => item.poblacion),
+        backgroundColor: ['#1ea86a', '#ff7b54', '#8c6bff', '#ffc857', '#4bb4d8', '#73c69c', '#d774d5', '#2d7ff9', '#7fbece'],
+        borderRadius: 7,
         borderSkipped: false,
       }]
     },
     options: {
+      indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
-      animation: { duration: 280 },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: context => `${context.parsed.y} registros`
+            label: context => {
+              const item = populationDepartments[context.dataIndex];
+              return `${context.parsed.x.toLocaleString('es-CO')} personas (${item ? item.porcentaje : 0}%)`;
+            }
           }
         }
       },
       scales: {
-        x: {
-          ticks: { color: C.muted, font: { family: 'DM Sans', size: 10 } },
-          grid: { display: false },
+        x: { beginAtZero: true, ticks: { color: C.muted }, grid: { color: 'rgba(20,42,49,0.06)' } },
+        y: { ticks: { color: C.muted, font: { family: 'DM Sans', size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('chart-diferencias'), {
+    type: 'bar',
+    data: {
+      labels: comparisonDepartments.map(item => item.label),
+      datasets: [
+        {
+          label: 'Matriculación (ponderada)',
+          data: comparisonDepartments.map(item => item.matriculacion),
+          backgroundColor: 'rgba(30, 168, 106, 0.82)',
+          borderRadius: 5,
         },
-        y: {
-          beginAtZero: true,
-          ticks: { color: C.muted },
-          grid: { color: 'rgba(20,42,49,0.06)' }
+        {
+          label: 'Cobertura neta (ponderada)',
+          data: comparisonDepartments.map(item => item.cobertura),
+          backgroundColor: 'rgba(140, 107, 255, 0.78)',
+          borderRadius: 5,
         }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: C.muted, font: { family: 'DM Sans', size: 10 } } },
+        tooltip: { callbacks: { label: context => `${context.dataset.label}: ${context.parsed.x ?? 0}%` } }
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { color: C.muted }, grid: { color: 'rgba(20,42,49,0.06)' } },
+        y: { ticks: { color: C.muted, font: { family: 'DM Sans', size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('chart-zonas'), {
+    type: 'bar',
+    data: {
+      labels: unusualZones.map(item => item.label),
+      datasets: [
+        {
+          label: 'Cobertura neta',
+          data: unusualZones.map(item => item.cobertura),
+          backgroundColor: 'rgba(140, 107, 255, 0.78)',
+          borderRadius: 5,
+        },
+        {
+          label: 'Deserción',
+          data: unusualZones.map(item => item.desercion),
+          backgroundColor: 'rgba(255, 123, 84, 0.82)',
+          borderRadius: 5,
+        }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: C.muted, font: { family: 'DM Sans', size: 10 } } },
+        tooltip: { callbacks: { label: context => `${context.dataset.label}: ${context.parsed.x ?? 0}%` } }
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { color: C.muted }, grid: { color: 'rgba(20,42,49,0.06)' } },
+        y: { ticks: { color: C.muted, font: { family: 'DM Sans', size: 10 } }, grid: { display: false } }
       }
     }
   });
