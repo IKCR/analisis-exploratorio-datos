@@ -18,15 +18,15 @@ _CACHE_TEMPORAL = None
 
 def _to_float(value):
 	if value is None:
-		return 0.0
+		return None
 	text = str(value).strip()
-	if not text or text.lower() == "nan":
-		return 0.0
+	if not text or text.lower() in ("nan", "null", "none", "-"):
+		return None
 	text = text.replace("%", "").replace(".", "").replace(",", ".")
 	try:
 		return float(text)
 	except ValueError:
-		return 0.0
+		return None
 
 
 def load_dataset():
@@ -73,35 +73,39 @@ def dataset_summary():
 			"peor_tasa": 0.0,
 		}
 
-	tasas = [_to_float(row.get("TASA_MATRICULACIÓN_5_16")) for row in rows]
-	mejor = max(rows, key=lambda row: _to_float(row.get("TASA_MATRICULACIÓN_5_16")))
-	peor = min(rows, key=lambda row: _to_float(row.get("TASA_MATRICULACIÓN_5_16")))
-	promedio = sum(tasas) / len(tasas) if tasas else 0.0
+	# Excluir registros agregados de nivel nacional
+	municipios_rows = [r for r in rows if r.get("DEPARTAMENTO", "").strip().upper() != "NACIONAL"]
+	tasas = [_to_float(row.get("TASA_MATRICULACIÓN_5_16")) for row in municipios_rows]
+	tasas_validas = [t for t in tasas if t is not None]
+	mejor = max(municipios_rows, key=lambda row: _to_float(row.get("TASA_MATRICULACIÓN_5_16")) or 0.0)
+	peor = min(municipios_rows, key=lambda row: _to_float(row.get("TASA_MATRICULACIÓN_5_16")) or 0.0)
+	promedio = sum(tasas_validas) / len(tasas_validas) if tasas_validas else 0.0
 
 	return {
-		"municipios": len(rows),
-		"departamentos": len({row.get("DEPARTAMENTO") for row in rows if row.get("DEPARTAMENTO")}),
+		"municipios": len(municipios_rows),
+		"departamentos": len({row.get("DEPARTAMENTO") for row in municipios_rows if row.get("DEPARTAMENTO")}),
 		"promedio_matriculacion": round(promedio, 2),
 		"mejor_municipio": mejor.get("MUNICIPIO", "Sin datos"),
-		"mejor_tasa": round(_to_float(mejor.get("TASA_MATRICULACIÓN_5_16")), 2),
+		"mejor_tasa": round(_to_float(mejor.get("TASA_MATRICULACIÓN_5_16")) or 0.0, 2),
 		"peor_municipio": peor.get("MUNICIPIO", "Sin datos"),
-		"peor_tasa": round(_to_float(peor.get("TASA_MATRICULACIÓN_5_16")), 2),
+		"peor_tasa": round(_to_float(peor.get("TASA_MATRICULACIÓN_5_16")) or 0.0, 2),
 	}
 
 
 def top_municipios(limit=5):
-	rows = sorted(
-		load_dataset(),
-		key=lambda row: _to_float(row.get("TASA_MATRICULACIÓN_5_16")),
+	rows = [r for r in load_dataset() if r.get("DEPARTAMENTO", "").strip().upper() != "NACIONAL"]
+	rows_ordenadas = sorted(
+		rows,
+		key=lambda row: _to_float(row.get("TASA_MATRICULACIÓN_5_16")) or 0.0,
 		reverse=True,
 	)
 	return [
 		{
 			"municipio": row.get("MUNICIPIO", "-"),
 			"departamento": row.get("DEPARTAMENTO", "-"),
-			"tasa": round(_to_float(row.get("TASA_MATRICULACIÓN_5_16")), 2),
+			"tasa": round(_to_float(row.get("TASA_MATRICULACIÓN_5_16")) or 0.0, 2),
 		}
-		for row in rows[:limit]
+		for row in rows_ordenadas[:limit]
 	]
 
 
@@ -348,19 +352,22 @@ def _build_datos_temporales():
 	}))
 
 	for row in rows:
+		anio_str = row.get("AÑO") or row.get("AO")
 		try:
-			anio = int(row.get("AÑO", 0))
-		except ValueError:
+			anio = int(anio_str)
+		except (ValueError, TypeError):
 			continue
-		depto = row.get("DEPARTAMENTO", "").strip()
-		if not depto or anio < 2011:
+
+		depto = (row.get("DEPARTAMENTO") or "").strip()
+		# Excluir registros agregados de nivel nacional y registros previos a 2011
+		if not depto or depto.upper() == "NACIONAL" or anio < 2011:
 			continue
 
 		campos = {
 			"cob":   _to_float(row.get("COBERTURA_NETA")),
-			"des":   _to_float(row.get("DESERCIÓN")),
+			"des":   _to_float(row.get("DESERCIÓN") or row.get("DESERCIN")),
 			"con":   _to_float(row.get("SEDES_CONECTADAS_A_INTERNET")),
-			"cob_t": _to_float(row.get("COBERTURA_NETA_TRANSICIÓN")),
+			"cob_t": _to_float(row.get("COBERTURA_NETA_TRANSICIÓN") or row.get("COBERTURA_NETA_TRANSICIN")),
 			"cob_p": _to_float(row.get("COBERTURA_NETA_PRIMARIA")),
 			"cob_s": _to_float(row.get("COBERTURA_NETA_SECUNDARIA")),
 			"cob_m": _to_float(row.get("COBERTURA_NETA_MEDIA")),
@@ -369,7 +376,8 @@ def _build_datos_temporales():
 		for destino in [depto, "TODOS"]:
 			g = grupos[destino][anio]
 			for campo, v in campos.items():
-				if v > 0:
+				# Conservar valores numéricos reales (incluyendo 0.0) y descartar solo nulos
+				if v is not None:
 					g[campo].append(v)
 
 	def _avg(lst):
