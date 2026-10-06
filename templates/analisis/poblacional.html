@@ -2,20 +2,301 @@
 
 {% block titulo %}{{ titulo }} | EduMunicipios{% endblock %}
 
+{% macro miles(n) -%}
+{% if n is not none %}{{ '{:,.0f}'.format(n)|replace(',', '.') }}{% else %}—{% endif %}
+{%- endmacro %}
+
+{% macro cantidad(n) -%}
+{{ miles(n) }} {% if n == 1 %}municipio{% else %}municipios{% endif %}
+{%- endmacro %}
+
+{% macro dec(n) -%}
+{% if n is not none %}{{ n|string|replace('.', ',') }}{% else %}—{% endif %}
+{%- endmacro %}
+
 {% block contenido %}
+{% set ind = datos.indicadores %}
+{% set gs = datos.grupos|selectattr('municipios')|list %}
+<style>
+  .pob-card { border: 1px solid #d7e7ee; border-radius: 14px; background: #fff; padding: 1.25rem; height: 100%; }
+  .pob-kpi-valor { font-size: 2rem; font-weight: 700; color: #0e7d4f; line-height: 1.1; }
+  .pob-kpi-label { font-weight: 600; color: #142a31; }
+  .pob-nota { font-size: .875rem; color: #5d7380; }
+  .pob-interpretacion { background: #f5f9ff; border-left: 4px solid #1ea86a; border-radius: 6px; padding: .75rem 1rem; margin-top: 1rem; }
+  .pob-grafica { position: relative; height: 320px; }
+  .pob-conocimiento dt { color: #0e7d4f; }
+  .pob-conocimiento dd { margin-bottom: .6rem; }
+</style>
+
 <section class="analysis-section">
   <div class="container analysis-container">
     <p class="eyebrow"><i class="bi bi-people" aria-hidden="true"></i> Análisis de datos</p>
     <h1>{{ titulo }}</h1>
-    <p class="analysis-lead">Esta dimensión está preparada para incorporar indicadores poblacionales y comparativos entre municipios en una etapa posterior.</p>
+    <p class="analysis-lead"><strong>Pregunta de análisis:</strong> ¿Cómo está compuesta y distribuida la población analizada según sus principales características?</p>
 
-    <div class="construction-panel">
-      <span class="construction-icon"><i class="bi bi-tools" aria-hidden="true"></i></span>
-      <div>
-        <h2>Sin contenido por ahora</h2>
-        <p>La información de esta dimensión se agregará más adelante.</p>
+    <!-- Filtros -->
+    <form method="get" class="pob-card mb-4">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label for="anio" class="form-label fw-semibold">Año</label>
+          <select id="anio" name="anio" class="form-select">
+            {% for a in datos.anios|reverse %}
+            <option value="{{ a }}" {% if a == datos.anio %}selected{% endif %}>{{ a }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-5">
+          <label for="departamento" class="form-label fw-semibold">Departamento</label>
+          <select id="departamento" name="departamento" class="form-select">
+            <option value="Todos">Todos (total nacional)</option>
+            {% for d in datos.departamentos %}
+            <option value="{{ d }}" {% if d == datos.departamento %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <button type="submit" class="btn btn-success w-100"><i class="bi bi-funnel" aria-hidden="true"></i> Aplicar filtros</button>
+        </div>
+      </div>
+      <p class="pob-nota mt-2 mb-0">Mostrando: <strong>{{ datos.departamento }}</strong>, año <strong>{{ datos.anio }}</strong>.</p>
+    </form>
+
+    <!-- Indicadores -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <div class="pob-card">
+          <div class="pob-kpi-label">Población de 5 a 16 años</div>
+          <div class="pob-kpi-valor">{{ miles(ind.poblacion_total) }}</div>
+          <div class="pob-nota">Niños, niñas y adolescentes en edad escolar.</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="pob-card">
+          <div class="pob-kpi-label">Municipios analizados</div>
+          <div class="pob-kpi-valor">{{ miles(ind.municipios) }}</div>
+          <div class="pob-nota">Mediana: {{ miles(ind.poblacion_mediana) }} niños por municipio.</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="pob-card">
+          <div class="pob-kpi-label">Cobertura neta</div>
+          <div class="pob-kpi-valor">{{ dec(ind.cobertura_ponderada) }} %</div>
+          <div class="pob-nota">Ponderada por población. Promedio simple entre municipios: {{ dec(ind.cobertura_simple) }} %.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Variables -->
+    <div class="pob-card mb-4">
+      <h2 class="h5">Variables utilizadas</h2>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Variable</th><th>Tipo</th><th>Descripción</th></tr></thead>
+          <tbody>
+            <tr><td>AÑO</td><td>Temporal</td><td>Año del registro (2011–2024). Se usa como filtro.</td></tr>
+            <tr><td>DEPARTAMENTO</td><td>Territorial (categórica)</td><td>Departamento del municipio. Se usa como filtro.</td></tr>
+            <tr><td>POBLACIÓN_5_16</td><td>Numérica</td><td>Población en edad escolar. Con ella se crea la categoría <em>tamaño del municipio</em>.</td></tr>
+            <tr><td>COBERTURA_NETA</td><td>Numérica (%)</td><td>Porcentaje de la población en edad escolar matriculada en el nivel que le corresponde. Con ella se crea la categoría <em>nivel de cobertura</em>.</td></tr>
+            <tr><td>DESERCIÓN</td><td>Numérica (%)</td><td>Porcentaje de estudiantes que abandonan el sistema durante el año.</td></tr>
+            <tr><td>APROBACIÓN</td><td>Numérica (%)</td><td>Porcentaje de estudiantes que aprueban el año escolar.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="pob-nota mt-2 mb-0">Limpieza aplicada: se excluyeron las filas de total "NACIONAL", se corrigió la población de 2021 (escrita con separadores de miles incompletos), se convirtieron los porcentajes de texto a número y se unificaron los nombres de Bogotá y San Andrés.</p>
+    </div>
+
+    <!-- Gráfica 1 -->
+    <div class="pob-card mb-4">
+      <h2 class="h5">1. Municipios y población según el tamaño del municipio</h2>
+      <p class="pob-nota">Los municipios se agrupan según su población de 5 a 16 años. Se compara qué porcentaje de municipios y qué porcentaje de la población hay en cada grupo.</p>
+      <div class="pob-grafica"><canvas id="graficaTamano"></canvas></div>
+      {% if gs|length > 1 %}
+      <div class="pob-interpretacion">
+        <strong>Interpretación:</strong>
+        El grupo predominante en cantidad de municipios es <strong>{{ datos.predominante.nombre }}</strong>
+        ({{ dec(datos.predominante.pct_municipios) }} % de los municipios), que reúne el
+        {{ dec(datos.predominante.pct_poblacion) }} % de la población.
+        {% if datos.mayor_poblacion.nombre != datos.predominante.nombre %}
+        En cambio, el grupo con más población es <strong>{{ datos.mayor_poblacion.nombre }}</strong>: concentra el
+        {{ dec(datos.mayor_poblacion.pct_poblacion) }} % de los niños con solo {{ cantidad(datos.mayor_poblacion.municipios) }}.
+        {% endif %}
+        El grupo minoritario es <strong>{{ datos.minoritario.nombre }}</strong>, con {{ cantidad(datos.minoritario.municipios) }}.
+        {% if datos.mayor_poblacion.pct_poblacion > datos.mayor_poblacion.pct_municipios %}
+        La población está concentrada en pocos municipios y repartida en muchos municipios pequeños.
+        {% endif %}
+      </div>
+      {% elif gs|length == 1 %}
+      <div class="pob-interpretacion"><strong>Interpretación:</strong> Todos los municipios de esta selección pertenecen al grupo <strong>{{ gs[0].nombre }}</strong>, así que no hay otros grupos de tamaño para comparar.</div>
+      {% endif %}
+    </div>
+
+    <!-- Gráfica 2 -->
+    <div class="pob-card mb-4">
+      <h2 class="h5">2. Cobertura neta y deserción según el tamaño del municipio</h2>
+      <p class="pob-nota">Promedios ponderados por población dentro de cada grupo de tamaño.</p>
+      <div class="pob-grafica"><canvas id="graficaCobertura"></canvas></div>
+      {% if gs|length > 1 %}
+      <div class="pob-interpretacion">
+        <strong>Interpretación:</strong>
+        En el grupo <strong>{{ gs[0].nombre }}</strong> la cobertura neta es de {{ dec(gs[0].cobertura) }} %, mientras que en el grupo
+        <strong>{{ gs[-1].nombre }}</strong> es de {{ dec(gs[-1].cobertura) }} %.
+        {% if gs[0].cobertura is not none and gs[-1].cobertura is not none and gs[-1].cobertura > gs[0].cobertura %}
+        La cobertura tiende a ser mayor en los municipios con más población, lo que sugiere mejores condiciones de acceso a la educación en los centros urbanos.
+        {% else %}
+        En esta selección la cobertura no aumenta con el tamaño del municipio.
+        {% endif %}
+        La deserción no sigue el mismo patrón y varía entre {{ dec(gs|map(attribute='desercion')|reject('none')|min) }} % y {{ dec(gs|map(attribute='desercion')|reject('none')|max) }} % entre grupos.
+      </div>
+      {% elif gs|length == 1 %}
+      <div class="pob-interpretacion"><strong>Interpretación:</strong> Esta selección tiene un solo grupo de tamaño ({{ gs[0].nombre }}), con cobertura neta de {{ dec(gs[0].cobertura) }} % y deserción de {{ dec(gs[0].desercion) }} %. No hay otros grupos para comparar.</div>
+      {% endif %}
+    </div>
+
+    <!-- Gráfica 3 -->
+    <div class="pob-card mb-4">
+      <h2 class="h5">3. Municipios según su nivel de cobertura neta</h2>
+      <p class="pob-nota">Cada municipio se clasifica según su cobertura neta: baja (menos de 70 %), media (70 % a 90 %) o alta (90 % o más).</p>
+      <div class="pob-grafica"><canvas id="graficaNiveles"></canvas></div>
+      <div class="pob-interpretacion">
+        <strong>Interpretación:</strong>
+        Cobertura {% for n in datos.niveles %}{{ n.nombre.split(' (')[0]|lower }}: {{ cantidad(n.municipios) }} ({{ dec(n.pct) }} %){% if not loop.last %}; {% else %}.{% endif %}{% endfor %}
+        Los municipios con cobertura baja son los que tienen una mayor proporción de niños en edad escolar fuera del nivel educativo que les corresponde.
+      </div>
+    </div>
+
+    <!-- Distribución -->
+    <div class="pob-card mb-4">
+      <h2 class="h5">Distribución de las variables principales</h2>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Variable</th><th>Mínimo</th><th>Mediana</th><th>Promedio</th><th>Máximo</th></tr></thead>
+          <tbody>
+            {% for v in datos.distribucion %}
+            <tr>
+              <td>{{ v.variable }}</td>
+              {% if loop.first %}
+              <td>{{ miles(v.minimo) }}</td><td>{{ miles(v.mediana) }}</td><td>{{ miles(v.promedio) }}</td><td>{{ miles(v.maximo) }}</td>
+              {% else %}
+              <td>{{ dec(v.minimo) }}</td><td>{{ dec(v.mediana) }}</td><td>{{ dec(v.promedio) }}</td><td>{{ dec(v.maximo) }}</td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="pob-nota mt-2 mb-0">Cuando el promedio es mucho mayor que la mediana, como en la población, significa que unos pocos municipios muy grandes elevan el promedio: el municipio "típico" es mucho más pequeño que el promedio.</p>
+    </div>
+
+    <!-- Conocimientos evidentes -->
+    <h2 class="h4 mt-5 mb-3">Conocimientos evidentes</h2>
+    <p class="pob-nota">Calculados con los datos de 2024 para el total nacional.</p>
+
+    <div class="pob-card mb-3 pob-conocimiento">
+      <h3 class="h6">Conocimiento 1: la población escolar está concentrada en pocos municipios</h3>
+      <dl class="mb-0">
+        <dt>Pregunta</dt><dd>¿Cómo se reparte la población de 5 a 16 años entre municipios de distinto tamaño?</dd>
+        <dt>Variables</dt><dd>POBLACIÓN_5_16 y la categoría creada <em>tamaño del municipio</em>.</dd>
+        <dt>Procedimiento</dt><dd>Se agruparon los 1.122 municipios en cinco rangos de población y se calculó el porcentaje de municipios y de población de cada rango.</dd>
+        <dt>Evidencia</dt><dd>Gráfica 1.</dd>
+        <dt>Hallazgo</dt><dd>El 39 % de los municipios tiene menos de 2.000 niños y reúne solo el 5,1 % de la población. En cambio, 28 municipios (2,5 %) con más de 50.000 niños concentran el 44,7 % de la población.</dd>
+        <dt>Interpretación</dt><dd>Colombia tiene muchos municipios pequeños, pero la mayor parte de la población escolar vive en pocas ciudades grandes.</dd>
+        <dt>Utilidad</dt><dd>Ayuda a decidir dónde concentrar recursos según el objetivo: las ciudades grandes para atender a más niños, o los municipios pequeños para llegar a más territorios.</dd>
+        <dt>Limitación</dt><dd>Los rangos de tamaño fueron definidos por el equipo; con otros cortes los porcentajes cambian, aunque la concentración se mantiene.</dd>
+      </dl>
+    </div>
+
+    <div class="pob-card mb-3 pob-conocimiento">
+      <h3 class="h6">Conocimiento 2: los municipios más pequeños tienen menor cobertura</h3>
+      <dl class="mb-0">
+        <dt>Pregunta</dt><dd>¿La cobertura neta es igual en municipios pequeños y grandes?</dd>
+        <dt>Variables</dt><dd>COBERTURA_NETA, POBLACIÓN_5_16 y la categoría <em>tamaño del municipio</em>.</dd>
+        <dt>Procedimiento</dt><dd>Se calculó la cobertura neta de cada grupo de tamaño con un promedio ponderado por población.</dd>
+        <dt>Evidencia</dt><dd>Gráfica 2 e indicador de cobertura neta.</dd>
+        <dt>Hallazgo</dt><dd>La cobertura sube con el tamaño del municipio: 77,5 % en los de menos de 2.000 niños frente a 91,4 % en los de más de 50.000. El promedio simple entre municipios es 81,0 %, pero el ponderado por población es 88,2 %.</dd>
+        <dt>Interpretación</dt><dd>Los municipios pequeños, que son la mayoría, tienen más dificultades para que los niños estén en el nivel educativo que les corresponde. El promedio nacional oculta esta diferencia porque las ciudades grandes pesan más.</dd>
+        <dt>Utilidad</dt><dd>Muestra que no basta con mirar el promedio nacional: hay que revisar los municipios pequeños por separado.</dd>
+        <dt>Limitación</dt><dd>Muestra una asociación, no una causa. No se puede afirmar que el tamaño del municipio por sí solo produzca la menor cobertura.</dd>
+      </dl>
+    </div>
+
+    <div class="pob-card mb-4 pob-conocimiento">
+      <h3 class="h6">Conocimiento 3: uno de cada cinco municipios tiene cobertura baja</h3>
+      <dl class="mb-0">
+        <dt>Pregunta</dt><dd>¿Cuántos municipios tienen cobertura baja, media o alta?</dd>
+        <dt>Variables</dt><dd>COBERTURA_NETA y la categoría creada <em>nivel de cobertura</em>.</dd>
+        <dt>Procedimiento</dt><dd>Se clasificó cada municipio como baja (menos de 70 %), media (70 % a 90 %) o alta (90 % o más) y se contaron los municipios de cada nivel.</dd>
+        <dt>Evidencia</dt><dd>Gráfica 3.</dd>
+        <dt>Hallazgo</dt><dd>231 municipios (20,6 %) tienen cobertura baja, 612 (54,5 %) media y 279 (24,9 %) alta. El grupo predominante es el de cobertura media.</dd>
+        <dt>Interpretación</dt><dd>La mayoría de municipios está en un nivel intermedio, pero hay un grupo importante con cobertura baja que requiere atención.</dd>
+        <dt>Utilidad</dt><dd>Permite identificar una lista concreta de municipios prioritarios para programas de acceso escolar.</dd>
+        <dt>Limitación</dt><dd>Algunos municipios superan el 100 % (hasta 177,4 %) porque reciben estudiantes de otros municipios, y otros aparecen con 0 %. Estos casos pueden distorsionar la clasificación.</dd>
+      </dl>
+    </div>
+
+    <!-- Limitación y decisión -->
+    <div class="row g-3 mb-5">
+      <div class="col-md-6">
+        <div class="pob-card">
+          <h2 class="h5"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Limitación del análisis</h2>
+          <p class="mb-0">Cada registro es un municipio y no una persona, por lo que no se pueden conocer características individuales como sexo, zona rural o urbana, o situación económica. Además, la población baja de forma brusca entre 2017 y 2018 (de 10,2 a 9,4 millones), posiblemente por un cambio en las proyecciones de población; por eso las comparaciones entre esos años deben hacerse con cuidado.</p>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="pob-card">
+          <h2 class="h5"><i class="bi bi-lightbulb" aria-hidden="true"></i> Decisión sustentada en los datos</h2>
+          <p class="mb-0">Priorizar los municipios con menos de 5.000 niños y cobertura baja en los programas de acceso escolar (transporte, alimentación y búsqueda activa de niños fuera del sistema). Aunque reúnen una parte pequeña de la población, son la mayoría de municipios del país y presentan la cobertura más baja.</p>
+        </div>
       </div>
     </div>
   </div>
 </section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  (function () {
+    if (typeof Chart === "undefined") { return; }
+    const grupos = {{ datos.grupos|tojson }};
+    const niveles = {{ datos.niveles|tojson }};
+    const etiquetas = grupos.map(g => g.nombre);
+    const porcentaje = { callbacks: { label: c => c.dataset.label + ": " + String(c.parsed.y ?? c.parsed).replace(".", ",") + " %" } };
+
+    new Chart(document.getElementById("graficaTamano"), {
+      type: "bar",
+      data: {
+        labels: etiquetas,
+        datasets: [
+          { label: "% de municipios", data: grupos.map(g => g.pct_municipios), backgroundColor: "#8c6bff" },
+          { label: "% de población", data: grupos.map(g => g.pct_poblacion), backgroundColor: "#1ea86a" }
+        ]
+      },
+      options: { maintainAspectRatio: false, plugins: { tooltip: porcentaje },
+        scales: { y: { beginAtZero: true, title: { display: true, text: "Porcentaje (%)" } },
+                  x: { title: { display: true, text: "Niños de 5 a 16 años por municipio" } } } }
+    });
+
+    new Chart(document.getElementById("graficaCobertura"), {
+      type: "bar",
+      data: {
+        labels: etiquetas,
+        datasets: [
+          { label: "Cobertura neta", data: grupos.map(g => g.cobertura), backgroundColor: "#1ea86a", yAxisID: "y" },
+          { label: "Deserción", data: grupos.map(g => g.desercion), backgroundColor: "#ff7b54", yAxisID: "y2" }
+        ]
+      },
+      options: { maintainAspectRatio: false, plugins: { tooltip: porcentaje },
+        scales: { y: { beginAtZero: true, position: "left", title: { display: true, text: "Cobertura neta (%)" } },
+                  y2: { beginAtZero: true, position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "Deserción (%)" } } } }
+    });
+
+    new Chart(document.getElementById("graficaNiveles"), {
+      type: "doughnut",
+      data: {
+        labels: niveles.map(n => n.nombre),
+        datasets: [{ label: "Municipios", data: niveles.map(n => n.municipios), backgroundColor: ["#ff7b54", "#ffc857", "#1ea86a"] }]
+      },
+      options: { maintainAspectRatio: false,
+        plugins: { tooltip: { callbacks: { label: c => c.label + ": " + c.parsed + " municipios (" + String(niveles[c.dataIndex].pct).replace(".", ",") + " %)" } } } }
+    });
+  })();
+</script>
 {% endblock %}

@@ -8,6 +8,8 @@ import plotly.express as px
 
 from flask import Flask, render_template, request, send_file
 
+from poblacional import tablero_poblacional
+
 app = Flask(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -530,12 +532,12 @@ def dataset_file():
 
 @app.route("/analisis/poblacional")
 def poblacional():
-	resumen = dataset_summary()
+	anio = request.args.get("anio", type=int)
+	departamento = request.args.get("departamento")
 	return render_template(
 		"analisis/poblacional.html",
 		titulo="Dimensión poblacional",
-		resumen=resumen,
-		top_municipios=top_municipios(),
+		datos=tablero_poblacional(anio, departamento),
 	)
 
 
